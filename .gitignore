@@ -1,0 +1,12 @@
+# Node
+node_modules/
+npm-debug.log*
+# Entorno / secretos
+.env
+*.local
+# Sistema
+.DS_Store
+Thumbs.db
+# Backups / temporales
+*.bak
+*.tmp
