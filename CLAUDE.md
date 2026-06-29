@@ -31,7 +31,7 @@ Flujo en 3 etapas sobre 2 programas:
    Ficha") para anotar a mano, y el **Informe de Ensayo** final que se entrega al cliente.
    **El informe debe reproducirse EXACTAMENTE igual.**
 
-Detalle completo en `ZENG - Relevamiento del Sistema Actual.pdf`.
+Detalle completo en `docs/ZENG - Relevamiento del Sistema Actual.pdf`.
 
 ## Arquitectura (dirección elegida)
 - **Base de datos:** PostgreSQL (relacional, libre, corre en Windows/Linux/Raspberry).
@@ -43,7 +43,7 @@ Detalle completo en `ZENG - Relevamiento del Sistema Actual.pdf`.
 - Falta confirmar con el lab: motor (Postgres vs seguir SQL Server), tipo de servidor, web vs escritorio.
 
 ## Modelo de datos
-Esquema v1 (PostgreSQL) en **`zeng_esquema_v1.sql`**. 8 tablas:
+Esquema v1 (PostgreSQL) en **`db/zeng_esquema_v1.sql`**. 8 tablas:
 - Catálogo: `clientes`, `usuarios`, `ensayos`, `parametros`.
 - Operación: `muestras`, `analisis`, `resultados`, `informes`.
 Notas: `numero_cliente` es texto (ej. "026 A"); `valor` del resultado es texto (ej. "<1.0*10(1)",
@@ -58,7 +58,7 @@ se arma en la app, no se guarda como texto.
 - "Muestra Interna" = "Muestra" en todas las etapas = mismo contador global.
 
 ## Pendiente (2ª visita al lab)
-Ver `ZENG - Checklist 2a visita.pdf`. Lo grande: mapeo **ensayo → parámetros**, copia de **cada
+Ver `docs/ZENG - Checklist 2a visita.pdf`. Lo grande: mapeo **ensayo → parámetros**, copia de **cada
 formato de informe**, **acceso a los datos** (Access / exportar / credenciales SQL), **infra y red**
 (PCs, máquina dedicada, backups), regla fina del **N° de informe por cliente**, y si un **informe
 agrupa una o varias muestras**. Negocio: cuánto pagan al programador hoy y cuántos labs hay.
@@ -70,12 +70,28 @@ agrupa una o varias muestras**. Negocio: cuánto pagan al programador hoy y cuá
 10. Completar + producción. 11. Validar precio y vender a un 2º lab.
 
 ## Archivos
-- `zeng_esquema_v1.sql` — esquema PostgreSQL (estructura de la base).
-- `ZENG - Relevamiento del Sistema Actual.pdf` — mapa completo del sistema actual.
-- `ZENG - Checklist 2a visita.pdf` — qué confirmar/traer de la próxima visita.
-- `guia_relevamiento_ZENG.docx`, `Proyecto_ZENG_Innovacion_Laboratorios.pdf` — material previo.
+- `db/` — base de datos: `zeng_esquema_v1.sql` (esquema PostgreSQL, estructura de la base).
+  A futuro: migraciones y seeds del catálogo también van acá.
+- `docs/` — toda la documentación del relevamiento y planificación:
+  - `ZENG - Relevamiento del Sistema Actual.pdf` — mapa completo del sistema actual.
+  - `ZENG - Checklist 2a visita.pdf` — qué confirmar/traer de la próxima visita.
+  - `guia_relevamiento_ZENG.docx`, `Proyecto_ZENG_Innovacion_Laboratorios.pdf` — material previo.
 
 ## Sobre quién desarrolla
 Francisco programa en JS/Node (principiante/intermedio, facultad), sin experiencia previa de
 bases de datos ni infraestructura. Explicar conceptos de DB/redes/servidores sin asumir
 experiencia. Proyecto y comunicación en español.
+
+## Cómo trabajamos (Cowork + Claude Code)
+Dos herramientas que NO comparten memoria automáticamente. Este archivo `CLAUDE.md` es la
+**memoria compartida**: mantenerlo actualizado es lo que las mantiene en sincronía.
+
+- **Claude Code (VS Code)** → CONSTRUIR: escribir y correr el código del repo (SQL, backend
+  Node, frontend), pruebas, git, debug.
+- **Cowork (chat de escritorio)** → PLANIFICAR e INVESTIGAR: estrategia, investigación
+  (precios/tecnología/mercado), documentos, diagramas y PDFs, preparar las visitas al lab.
+  Además mantiene este `CLAUDE.md` al día.
+- **Regla:** toda decisión importante se escribe acá (o en una carpeta `docs/`). Al terminar
+  una sesión en Claude Code, actualizá este archivo con lo que cambió, así la próxima sesión
+  —en cualquiera de las dos— arranca al día.
+- **Idioma:** todo en español.
