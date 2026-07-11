@@ -69,12 +69,41 @@ agrupa una o varias muestras**. Negocio: cuánto pagan al programador hoy y cuá
 7. Informe idéntico (PDF). 8. Frontend web. 9. MVP de un análisis + correr en paralelo.
 10. Completar + producción. 11. Validar precio y vender a un 2º lab.
 
+## Frontend — diseño visual (arrancado jul 2026, en paralelo a la 2ª visita)
+Se adelantó el diseño VISUAL de la app (decisión consciente de Francisco: no espera a
+cerrar el mapeo del problema, porque las pantallas generales no dependen de esas
+respuestas — el informe/reporte de ficha exactos sí van a esperar a la 2ª visita).
+
+- **Carpeta:** `web/` — proyecto Vite + React 19 + TypeScript, independiente del backend.
+- **Stack de UI:** Tailwind CSS v4 + componentes propios estilo shadcn/ui (Radix UI +
+  class-variance-authority) en `web/src/components/ui/`. Iconos: lucide-react.
+- **Paleta:** navy (`#16324f`) + teal (`#0f766e`), tomada de la identidad que ya tiene el
+  Informe de Ensayo actual (banda superior navy, acentos teal) — para que la app nueva se
+  sienta de la misma marca. Tokens en `web/src/index.css` (`@theme`).
+- **Tipografía:** system-ui, sin fuentes externas — el lab es 100% offline, no puede
+  depender de un CDN de fuentes (ni de ningún CDN en general, a futuro).
+- **Layout:** `AppShell` (sidebar navy con las 3 etapas + Panel/Clientes/Ensayos) en
+  `web/src/components/layout/AppShell.tsx`.
+- **Pantallas hechas:** Panel (dashboard placeholder) e "Ingreso de Muestra" (etapa 1,
+  formulario completo + tabla de muestras recientes) en `web/src/pages/`. El resto de las
+  etapas están como placeholder "Próximamente" en `App.tsx`, a definir en orden.
+- **Datos:** todo hardcodeado/mock por ahora (sin conexión a backend ni DB todavía). Los
+  nombres de ensayo 140/141/142/014/121 son placeholders — sólo 138 = Enterobacterias está
+  confirmado.
+- **Cómo correrlo:** `cd web && npm install && npm run dev`. `npm run build` para verificar
+  que compila (ya validado en jul 2026, sin errores de tipos).
+- **Pendiente:** validar el diseño con Francisco, seguir con "Carga de Resultados" y
+  "Cuaderno de Análisis", y más adelante decidir cómo este frontend se conecta al backend
+  (Node + PostgreSQL, todavía sin construir).
+
 ## Archivos
 - `db/` — base de datos: `zeng_esquema_v1.sql` (esquema PostgreSQL, estructura de la base).
   A futuro: migraciones y seeds del catálogo también van acá.
+- `web/` — frontend (diseño visual en progreso, ver sección de arriba).
 - `docs/` — toda la documentación del relevamiento y planificación:
   - `ZENG - Relevamiento del Sistema Actual.pdf` — mapa completo del sistema actual.
   - `ZENG - Checklist 2a visita.pdf` — qué confirmar/traer de la próxima visita.
+  - `ZENG - Estado del proyecto.pdf` — resumen de dónde quedó el proyecto (jul 2026).
   - `guia_relevamiento_ZENG.docx`, `Proyecto_ZENG_Innovacion_Laboratorios.pdf` — material previo.
 
 ## Sobre quién desarrolla
