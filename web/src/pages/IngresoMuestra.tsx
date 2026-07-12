@@ -96,14 +96,12 @@ const ESTADO_LABEL: Record<string, string> = {
   publicado: "Publicado",
 }
 
-function hoy() {
-  return new Date().toLocaleDateString("es-UY")
+function hoyISO() {
+  return new Date().toISOString().slice(0, 10)
 }
-function horaAhora() {
-  return new Date().toLocaleTimeString("es-UY", {
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+function horaAhoraISO() {
+  const d = new Date()
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }
 
 export function IngresoMuestra() {
@@ -132,7 +130,9 @@ export function IngresoMuestra() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="cliente">Cliente</Label>
+            <Label htmlFor="cliente">
+              Cliente <span className="text-red-500" aria-hidden="true">*</span>
+            </Label>
             <Select defaultValue={CLIENTES[0].numero}>
               <SelectTrigger id="cliente">
                 <SelectValue />
@@ -148,18 +148,22 @@ export function IngresoMuestra() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="descripcion">Descripción de la muestra</Label>
+            <Label htmlFor="descripcion">
+              Descripción de la muestra <span className="text-red-500" aria-hidden="true">*</span>
+            </Label>
             <Input id="descripcion" placeholder="Ej. 5 muestras de carne" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="fecha-entrada">Fecha de entrada</Label>
-              <Input id="fecha-entrada" defaultValue={hoy()} />
+              <Label htmlFor="fecha-entrada">
+                Fecha de entrada <span className="text-red-500" aria-hidden="true">*</span>
+              </Label>
+              <Input id="fecha-entrada" type="date" defaultValue={hoyISO()} />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="hora-entrada">Hora de entrada</Label>
-              <Input id="hora-entrada" defaultValue={horaAhora()} />
+              <Input id="hora-entrada" type="time" defaultValue={horaAhoraISO()} />
             </div>
           </div>
 
@@ -190,7 +194,9 @@ export function IngresoMuestra() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <Label>Ensayos a realizar</Label>
+            <Label>
+              Ensayos a realizar <span className="text-red-500" aria-hidden="true">*</span>
+            </Label>
             <div className="flex flex-wrap gap-1.5">
               {ENSAYOS.map((e) => {
                 const selected = ensayosSeleccionados.includes(e.codigo)
@@ -224,12 +230,20 @@ export function IngresoMuestra() {
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="observaciones">Observaciones</Label>
-            <Input id="observaciones" placeholder="Opcional" />
+            <textarea
+              id="observaciones"
+              rows={2}
+              placeholder="Opcional"
+              className="w-full resize-none rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 disabled:cursor-not-allowed disabled:opacity-50"
+            />
           </div>
         </CardContent>
-        <CardFooter className="justify-end gap-2">
-          <Button variant="outline">Limpiar</Button>
-          <Button variant="secondary">Guardar muestra</Button>
+        <CardFooter className="justify-between">
+          <p className="text-[11px] text-muted-foreground">* Campos obligatorios</p>
+          <div className="flex gap-2">
+            <Button variant="outline">Limpiar</Button>
+            <Button variant="secondary">Guardar muestra</Button>
+          </div>
         </CardFooter>
       </Card>
 

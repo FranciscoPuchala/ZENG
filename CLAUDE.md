@@ -84,17 +84,21 @@ respuestas — el informe/reporte de ficha exactos sí van a esperar a la 2ª vi
   depender de un CDN de fuentes (ni de ningún CDN en general, a futuro).
 - **Layout:** `AppShell` (sidebar navy con las 3 etapas + Panel/Clientes/Ensayos) en
   `web/src/components/layout/AppShell.tsx`.
-- **Pantallas hechas:** Panel (dashboard placeholder) e "Ingreso de Muestra" (etapa 1,
-  formulario completo + tabla de muestras recientes) en `web/src/pages/`. El resto de las
-  etapas están como placeholder "Próximamente" en `App.tsx`, a definir en orden.
-- **Datos:** todo hardcodeado/mock por ahora (sin conexión a backend ni DB todavía). Los
-  nombres de ensayo 140/141/142/014/121 son placeholders — sólo 138 = Enterobacterias está
-  confirmado.
+- **Pantallas hechas** en `web/src/pages/`:
+  - `Panel.tsx` — dashboard con 4 stat tiles (mock).
+  - `IngresoMuestra.tsx` — etapa 1 completa: formulario + tabla de recientes.
+  - `CargaResultados.tsx` — etapa 2: lista de análisis pendientes (seleccionable) +
+    formulario de carga de valores por parámetro.
+  - `CuadernoAnalisis.tsx` — etapa 3: tabla de análisis cargados con checkboxes para
+    agrupar en informe + form de datos del informe + placeholder de vista previa.
+- **Datos:** todo hardcodeado/mock. Ensayos 140/141/142/014/121 son placeholders —
+  sólo 138 = Enterobacterias está confirmado. Parámetros de cada ensayo también son
+  placeholder hasta la 2ª visita al lab.
 - **Cómo correrlo:** `cd web && npm install && npm run dev`. `npm run build` para verificar
   que compila (ya validado en jul 2026, sin errores de tipos).
-- **Pendiente:** validar el diseño con Francisco, seguir con "Carga de Resultados" y
-  "Cuaderno de Análisis", y más adelante decidir cómo este frontend se conecta al backend
-  (Node + PostgreSQL, todavía sin construir).
+- **Pendiente:** validar las 3 pantallas con Francisco, conectar al backend (Node +
+  PostgreSQL, todavía sin construir), y definir el formato exacto del Informe de Ensayo
+  después de la 2ª visita.
 
 ## Archivos
 - `db/` — base de datos: `zeng_esquema_v1.sql` (esquema PostgreSQL, estructura de la base).

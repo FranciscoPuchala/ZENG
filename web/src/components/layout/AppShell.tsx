@@ -36,20 +36,27 @@ export function AppShell({
 }) {
   return (
     <div className="flex min-h-screen bg-background">
-      <aside className="flex w-60 shrink-0 flex-col bg-navy-900 text-white">
-        <div className="flex items-center gap-2 px-5 py-5">
-          <div className="flex size-8 items-center justify-center rounded-md bg-teal-600 text-sm font-bold">
+      <aside className="flex w-62 shrink-0 flex-col bg-navy-950 text-white">
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-5 py-5">
+          <div
+            className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-700 text-sm font-bold text-white"
+            style={{ boxShadow: "0 2px 10px rgb(15 118 110 / 0.5)" }}
+          >
             Z
           </div>
           <div className="leading-tight">
-            <div className="text-sm font-semibold">ZENG</div>
-            <div className="text-[11px] text-navy-100/70">
+            <div className="text-sm font-semibold tracking-wide text-white">
+              ZENG
+            </div>
+            <div className="text-[11px] tracking-wide text-navy-100/55">
               Laboratorio Microbiológico
             </div>
           </div>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-0.5 px-3">
+        {/* Nav */}
+        <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-1">
           {NAV_ITEMS.map((item) => {
             const isActive = item.label === active
             const Icon = item.icon
@@ -57,22 +64,28 @@ export function AppShell({
               <button
                 key={item.label}
                 onClick={() => onNavigate?.(item.label)}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                  "flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm transition-all duration-150",
                   isActive
-                    ? "bg-teal-700/90 text-white"
-                    : "text-navy-100/80 hover:bg-navy-800 hover:text-white"
+                    ? "bg-teal-700 text-white shadow-sm"
+                    : "text-navy-100/65 hover:bg-navy-800/70 hover:text-white"
                 )}
               >
-                <Icon className="size-4 shrink-0" />
+                <Icon
+                  className={cn(
+                    "size-4 shrink-0 transition-colors",
+                    isActive ? "text-teal-200" : "text-navy-100/50"
+                  )}
+                />
                 <span className="flex-1">{item.label}</span>
                 {item.etapa && (
                   <span
                     className={cn(
-                      "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                      "rounded-md px-1.5 py-0.5 text-[10px] font-medium transition-colors",
                       isActive
-                        ? "bg-white/15 text-white"
-                        : "bg-white/5 text-navy-100/60"
+                        ? "bg-white/15 text-teal-100"
+                        : "bg-white/5 text-navy-100/40"
                     )}
                   >
                     {item.etapa}
@@ -83,28 +96,36 @@ export function AppShell({
           })}
         </nav>
 
-        <div className="border-t border-white/10 px-3 py-3">
-          <button className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-navy-100/70 hover:bg-navy-800 hover:text-white">
+        {/* Footer */}
+        <div className="border-t border-white/8 px-3 py-3">
+          <button className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-navy-100/55 transition-all duration-150 hover:bg-navy-800/70 hover:text-white">
             <Settings className="size-4" />
             Configuración
           </button>
-          <div className="mt-2 flex items-center gap-2 px-3 py-1">
-            <div className="flex size-7 items-center justify-center rounded-full bg-navy-700 text-xs font-medium">
+          <div className="mt-1.5 flex items-center gap-2.5 px-3 py-1.5">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-navy-700 to-navy-800 text-[11px] font-semibold ring-1 ring-white/15">
               FR
             </div>
-            <div className="text-xs text-navy-100/70">Francisco · Recepción</div>
+            <div className="text-xs text-navy-100/55">
+              Francisco · Recepción
+            </div>
           </div>
         </div>
       </aside>
 
+      {/* Contenido principal */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-6">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-card px-6 shadow-[0_1px_0_0_var(--color-border)]">
           <div className="text-sm font-medium text-foreground">{active}</div>
           <div className="text-xs text-muted-foreground">
             Servidor local · sin conexión a internet
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main className="flex-1 overflow-auto p-6">
+          <div key={active} className="animate-page-enter">
+            {children}
+          </div>
+        </main>
       </div>
     </div>
   )

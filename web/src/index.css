@@ -58,6 +58,12 @@
   --radius-lg: 12px;
 }
 
+@theme {
+  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.07), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+  --shadow-card-hover: 0 6px 20px -4px rgb(0 0 0 / 0.12), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+  --shadow-sidebar-logo: 0 2px 10px rgb(15 118 110 / 0.45);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -70,5 +76,54 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+}
+
+/* ── Transición de página ─────────────────────────────────────────── */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(7px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-page-enter {
+  animation: page-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ── Intro splash ─────────────────────────────────────────────────── */
+/*
+   Secuencia en 2 tiempos:
+   1. Logo "Z" sale del centro: scale grande → 1, 2 giros (720°), 4.5s.
+   2. Texto de bienvenida aparece suavemente después.
+*/
+
+@keyframes intro-logo-in {
+  0%   { transform: scale(10) rotateY(720deg); filter: blur(5px); opacity: 0.8; }
+  15%  { opacity: 1; }
+  100% { transform: scale(1)  rotateY(0deg);   filter: blur(0);   opacity: 1;   }
+}
+
+@keyframes intro-appear {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes intro-line-grow {
+  from { width: 0; opacity: 0; }
+  to   { width: 3rem; opacity: 1; }
+}
+
+.animate-intro-logo  { animation: intro-logo-in    4.5s cubic-bezier(0.1, 0.8, 0.2, 1) 0s    both; }
+.animate-intro-title { animation: intro-appear     0.7s ease-out                        3.5s  both; }
+.animate-intro-line  { animation: intro-line-grow  0.6s ease-out                        4.1s  both; }
+.animate-intro-sub   { animation: intro-appear     0.7s ease-out                        4.3s  both; }
+.animate-intro-sub2  { animation: intro-appear     0.7s ease-out                        4.6s  both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-page-enter,
+  .animate-intro-logo,
+  .animate-intro-title,
+  .animate-intro-line,
+  .animate-intro-sub,
+  .animate-intro-sub2 {
+    animation: none;
   }
 }
