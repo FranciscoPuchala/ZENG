@@ -95,32 +95,58 @@
    2. Texto de bienvenida aparece suavemente después.
 */
 
-@keyframes intro-logo-in {
-  0%   { transform: scale(10) rotateY(720deg); filter: blur(5px); opacity: 0.8; }
-  15%  { opacity: 1; }
-  100% { transform: scale(1)  rotateY(0deg);   filter: blur(0);   opacity: 1;   }
+/*
+  Dos capas separadas: la externa maneja el zoom (ease-out),
+  la interna maneja la rotación (linear = velocidad constante, siempre lento).
+*/
+@keyframes intro-logo-scale {
+  0%   { transform: scale(8); opacity: 0; filter: blur(4px); }
+  12%  { opacity: 1; filter: blur(0); }
+  100% { transform: scale(1); opacity: 1; filter: blur(0); }
+}
+@keyframes intro-logo-spin {
+  from { transform: rotateY(360deg); }
+  to   { transform: rotateY(0deg); }
 }
 
-@keyframes intro-appear {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+/*
+  Efecto telescopio: apertura de iris (clip-path circle) + enfoque desde lejos
+  (blur + scale) + letras que convergen (letter-spacing).
+*/
+@keyframes intro-telescopio {
+  0%   {
+    clip-path: circle(0% at 50% 50%);
+    transform: scale(0.6);
+    filter: blur(14px);
+    letter-spacing: 1em;
+    opacity: 0;
+  }
+  18%  { opacity: 1; }
+  100% {
+    clip-path: circle(200% at 50% 50%);
+    transform: scale(1);
+    filter: blur(0);
+    letter-spacing: 0.25em;
+    opacity: 1;
+  }
 }
 
-@keyframes intro-line-grow {
-  from { width: 0; opacity: 0; }
-  to   { width: 3rem; opacity: 1; }
+@keyframes intro-line-scan {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
 }
 
-.animate-intro-logo  { animation: intro-logo-in    4.5s cubic-bezier(0.1, 0.8, 0.2, 1) 0s    both; }
-.animate-intro-title { animation: intro-appear     0.7s ease-out                        3.5s  both; }
-.animate-intro-line  { animation: intro-line-grow  0.6s ease-out                        4.1s  both; }
-.animate-intro-sub   { animation: intro-appear     0.7s ease-out                        4.3s  both; }
-.animate-intro-sub2  { animation: intro-appear     0.7s ease-out                        4.6s  both; }
+/* Misma curva en ambos: desaceleran juntos y quedan quietos al mismo tiempo */
+.animate-intro-logo-scale { animation: intro-logo-scale  4.5s cubic-bezier(0.3, 0, 0.1, 1) 0s   both; }
+.animate-intro-logo-spin  { animation: intro-logo-spin   4.5s cubic-bezier(0.3, 0, 0.1, 1) 0s   both; }
+.animate-intro-line       { animation: intro-line-scan   0.5s ease-out                      4.2s both; }
+.animate-intro-sub        { animation: intro-telescopio  1.2s cubic-bezier(0.2, 0, 0.1, 1) 4.4s both; }
+.animate-intro-sub2       { animation: intro-telescopio  1.0s cubic-bezier(0.2, 0, 0.1, 1) 5.0s both; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-page-enter,
-  .animate-intro-logo,
-  .animate-intro-title,
+  .animate-intro-logo-scale,
+  .animate-intro-logo-spin,
   .animate-intro-line,
   .animate-intro-sub,
   .animate-intro-sub2 {

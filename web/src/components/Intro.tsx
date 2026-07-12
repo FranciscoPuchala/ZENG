@@ -6,8 +6,8 @@ export function Intro({ onDone }: { onDone: () => void }) {
   const [saliendo, setSaliendo] = React.useState(false)
 
   React.useEffect(() => {
-    const t1 = setTimeout(() => setSaliendo(true), 6500)
-    const t2 = setTimeout(onDone, 7500)
+    const t1 = setTimeout(() => setSaliendo(true), 7500)
+    const t2 = setTimeout(onDone, 8500)
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [onDone])
 
@@ -20,32 +20,31 @@ export function Intro({ onDone }: { onDone: () => void }) {
       ].join(" ")}
       style={{ perspective: "1200px" }}
     >
-      {/* Logo — arranca enorme desde el centro, gira 5 veces y se frena en posición */}
       <div
-        className="animate-intro-logo flex size-24 items-center justify-center rounded-3xl bg-gradient-to-br from-teal-400 to-teal-700 text-5xl font-bold text-white select-none"
-        style={{
-          boxShadow: "0 0 60px rgb(15 118 110 / 0.6), 0 0 140px rgb(15 118 110 / 0.25)",
-          willChange: "transform, filter",
-        }}
-      >
-        Z
-      </div>
-
-      <div
-        className="animate-intro-title mt-7 text-5xl font-bold text-white"
+        className="animate-intro-logo-scale select-none"
         style={{ willChange: "transform, opacity, filter" }}
       >
-        ZENG
+        <div className="animate-intro-logo-spin" style={{ willChange: "transform" }}>
+          <img
+            src="/logo.png"
+            alt="ZENG"
+            className="w-72"
+            draggable={false}
+            style={{ filter: "drop-shadow(0 0 24px rgb(15 118 110 / 0.7))" }}
+          />
+        </div>
       </div>
 
-      {/* Línea y bienvenida — entran desde abajo, más sutiles */}
-      <div className="animate-intro-line mt-4 h-px bg-teal-500/50" />
+      <div
+        className="animate-intro-line mt-8 h-px w-48 bg-teal-500/50"
+        style={{ transformOrigin: "left center" }}
+      />
 
-      <div className="animate-intro-sub mt-5 text-lg font-medium tracking-widest text-teal-300 uppercase">
+      <div className="animate-intro-sub mt-6 text-5xl font-bold tracking-widest text-teal-300 uppercase text-center">
         Bienvenido, {NOMBRE_USUARIO}
       </div>
 
-      <div className="animate-intro-sub2 mt-1.5 text-xs tracking-widest text-navy-100/35 uppercase">
+      <div className="animate-intro-sub2 mt-3 text-xl tracking-widest text-navy-100/50 uppercase text-center">
         Laboratorio Microbiológico
       </div>
     </div>

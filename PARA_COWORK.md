@@ -10,7 +10,7 @@
 
 ---
 
-## Última sesión — 11 jul 2026
+## Sesión anterior — 11 jul 2026
 
 ### 1. Reorganización de carpetas
 
@@ -33,15 +33,9 @@ ZENG/
 └── web/                    ← frontend React (ver abajo)
 ```
 
-Se actualizaron todas las referencias de rutas en `README.md` y `CLAUDE.md`.
-
----
-
-### 2. Frontend — estado actual de `web/`
+### 2. Frontend — pantallas terminadas
 
 **Stack:** Vite + React 19 + TypeScript + Tailwind CSS v4 + Radix UI (estilo shadcn/ui propio). Sin CDNs externos (lab offline).
-
-**Pantallas terminadas:**
 
 | Pantalla | Archivo | Estado |
 |---|---|---|
@@ -54,51 +48,75 @@ Se actualizaron todas las referencias de rutas en `README.md` y `CLAUDE.md`.
 
 **Cómo correrlo:**
 ```bash
-cd web && npm install && npm run dev
+cd web && npm run dev
 ```
 
----
+### 3. Mejoras de diseño (sesión UI/UX)
 
-### 3. Qué hace cada pantalla nueva
-
-#### Carga de Resultados (`CargaResultados.tsx`)
-- Lista lateral con los análisis en estado `pendiente`, filtrable por N° o cliente.
-- Al seleccionar uno, aparece el formulario: fecha/hora de siembra, analista, revisor, y tabla de parámetros con inputs para cargar el `valor` y la `lectura_dilución` de cada uno.
-- Los parámetros son **placeholder** (mapeo real ensayo → parámetros pendiente de la 2ª visita al lab).
-
-#### Cuaderno de Análisis (`CuadernoAnalisis.tsx`)
-- Tabla de análisis en estado `cargado` con checkboxes para seleccionar cuáles agrupar.
-- Al seleccionar, aparece el formulario de informe: N° informe, fecha de recepción, fecha de emisión.
-- Botón "Publicar informe" (mock, sin lógica todavía).
-- Placeholder de "Vista previa del Informe de Ensayo" — el formato exacto se define después de la 2ª visita.
+- Transición de página: fade + slide 7px, 220ms, curva iOS. Respeta `prefers-reduced-motion`.
+- Botones: `active:scale-[0.97]` — feedback físico de "press".
+- Sidebar: logo teal con sombra de color, íconos con color activo, avatar con gradiente.
+- Formularios: `type="date"` y `type="time"` nativos, campos obligatorios marcados, textarea para observaciones.
 
 ---
 
-### 4. Mejoras de diseño aplicadas (sesión UI/UX)
+## Última sesión — 11 jul 2026 (continuación)
 
-Se usó el skill **UI/UX Pro Max** para auditar y mejorar. Cambios concretos:
+### 4. Pantalla de intro (splash screen) — estado final
 
-**Animaciones y "vida":**
-- Transición de página: fade + slide de 7px en 220ms con curva iOS (`cubic-bezier(0.16, 1, 0.3, 1)`) al navegar entre secciones. Respeta `prefers-reduced-motion`.
-- Botones con `active:scale-[0.97]` — feedback físico de "press".
-- Stat tiles del Panel: hover que levanta la card con sombra de color del propio ícono (ámbar/azul/verde).
+La pantalla de bienvenida está completamente terminada en:
+- `web/src/components/Intro.tsx`
+- `web/src/index.css` (keyframes)
+- `web/public/logo.png` (logo real del laboratorio, PNG con fondo transparente)
 
-**Sidebar:**
-- Logo "Z" con gradiente teal y sombra de color.
-- Íconos con color propio en estado activo (`text-teal-200`).
-- Hover más suave (`navy-800/70`), bordes redondeados `rounded-lg`.
-- Avatar con gradiente y ring sutil.
+#### Cómo funciona la secuencia
 
-**Formularios (accesibilidad):**
-- `aria-current="page"` en el ítem activo del nav.
-- Campos de fecha → `type="date"`, hora → `type="time"` (picker nativo del navegador).
-- Indicadores `*` en campos obligatorios + nota "* Campos obligatorios" al pie.
-- `observaciones` → `<textarea>` en vez de input de una sola línea.
-- `aria-label` en buscadores y checkboxes.
+| Tiempo | Qué pasa |
+|---|---|
+| 0s | Logo ZENG real aparece desde el centro: zoom desde scale(8) + 2 giros rotateY |
+| ~4.5s | Logo frena y queda quieto en posición final |
+| 4.2s | Línea separadora se expande de izquierda a derecha (scaleX) |
+| 4.4s | "BIENVENIDO, FRANCISCO" aparece con efecto telescopio |
+| 5.0s | "LABORATORIO MICROBIOLÓGICO" aparece con efecto telescopio |
+| 7.5s | Pantalla empieza a desvanecerse (opacity-0) |
+| 8.5s | Panel carga |
 
-**Panel:**
-- Números de stats: `text-2xl font-bold tabular-nums`.
-- Íconos: `size-12 rounded-xl` (más grandes y redondeados).
+#### Efecto telescopio (lo más importante)
+
+Los textos de bienvenida tienen una animación personalizada que simula mirar a través de un telescopio:
+
+1. **Apertura de iris** — `clip-path: circle(0%)` → `circle(200%)`: el texto emerge desde un punto central como el diafragma de un lente abriéndose.
+2. **Enfoque desde lejos** — `filter: blur(14px)` → `blur(0)` + `scale(0.6)` → `scale(1)`: como cuando ajustás el foco de un telescopio y el objeto va apareciendo nítido.
+3. **Letras que convergen** — `letter-spacing: 1em` → `0.25em`: las letras arrancan muy separadas y se juntan, como si vinieran desde la distancia.
+
+```css
+/* En web/src/index.css */
+@keyframes intro-telescopio {
+  0%   { clip-path: circle(0% at 50% 50%); transform: scale(0.6); filter: blur(14px); letter-spacing: 1em; opacity: 0; }
+  18%  { opacity: 1; }
+  100% { clip-path: circle(200% at 50% 50%); transform: scale(1); filter: blur(0); letter-spacing: 0.25em; opacity: 1; }
+}
+```
+
+#### Animación del logo
+
+Dos divs anidados con animaciones independientes:
+- **Externo** (`animate-intro-logo-scale`): maneja el zoom `scale(8) → scale(1)` con `cubic-bezier(0.3, 0, 0.1, 1)`.
+- **Interno** (`animate-intro-logo-spin`): maneja la rotación `rotateY(360°) → rotateY(0°)` con la **misma curva**. Usar la misma curva es clave: hace que zoom y giro frenen juntos, entonces cuando el logo deja de girar ya está en posición final (no sigue achicándose después).
+
+#### Logo real
+
+Francisco proveyó el logo real del laboratorio. Se copió a `web/public/logo.png`. Es PNG con fondo transparente, por eso no necesita ningún tratamiento — flota directamente sobre el fondo navy. Se le agrega un `drop-shadow` teal para que resalte:
+
+```tsx
+style={{ filter: "drop-shadow(0 0 24px rgb(15 118 110 / 0.7))" }}
+```
+
+#### Textos
+
+- "BIENVENIDO, FRANCISCO": `text-5xl font-bold` — muy grande, en teal.
+- "LABORATORIO MICROBIOLÓGICO": `text-xl` — secundario, en `navy-100/50`.
+- `NOMBRE_USUARIO` está hardcodeado como constante en `Intro.tsx` — a futuro se reemplaza por el usuario logueado.
 
 ---
 
@@ -110,29 +128,16 @@ Se usó el skill **UI/UX Pro Max** para auditar y mejorar. Cambios concretos:
 - **Backend**: Node.js + PostgreSQL, sin empezar.
 - **Pantallas Clientes y Ensayos y Parámetros**: placeholders "Próximamente".
 - **Validación de formularios**: no hay validación client-side ni mensajes de error reales.
+- **Login / usuarios reales**: `NOMBRE_USUARIO` es una constante hardcodeada. A futuro el intro debe recibir el nombre del analista que se logueó.
 
 ---
 
-### 6. Decisiones tomadas en esta sesión
+### 6. Decisiones técnicas importantes
 
-- Se instaló el skill **UI/UX Pro Max** globalmente en `~/.claude/skills/` para que esté disponible en todas las sesiones de Claude Code.
-- Se mantuvo `system-ui` como tipografía (sin Google Fonts) por restricción offline del lab.
-- Los parámetros de ensayo `140 / 141 / 142 / 014 / 121` siguen como placeholder — no se inventaron nombres. Solo `138 = Enterobacterias` está confirmado.
-
----
-
-### 7. Ideas de animación / experiencia (a implementar o ya hechas)
-
-#### Pantalla de bienvenida animada (intro splash) ✅ Implementado
-Al cargar la app aparece una pantalla completa navy con el logo "Z" animado, el nombre ZENG
-con efecto de tracking, y "Bienvenido, [nombre]". Luego se desliza hacia arriba revelando el panel.
-
-Inspiración: TikToks de Claude haciendo animaciones tipo https://www.tiktok.com/@webloved/video/7638701785552588064
-
-Concepto aplicable a otras transiciones:
-- Cambio de sección importante → mini overlay o texto animado
-- Publicación de informe → animación de "éxito" (confetti ligero, check animado)
-- Login futuro → pantalla de bienvenida personalizada con el nombre del analista
+- **`system-ui` como tipografía**: sin Google Fonts por restricción offline del lab. No cambiar.
+- **Parámetros de ensayo**: `140 / 141 / 142 / 014 / 121` son placeholder. Solo `138 = Enterobacterias` está confirmado. No inventar nombres.
+- **`scale()` en vez de `translateZ`** para el zoom del intro: mucho más performante, la GPU lo maneja sin trabarse. `translateZ` cerca del límite de `perspective` causaba choppiness.
+- **Dos capas para animar**: siempre que se necesite animar dos propiedades con distinto easing (ej. zoom + rotación), usar dos divs anidados — cada uno con su propia animación CSS.
 
 ---
 

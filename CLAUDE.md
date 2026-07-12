@@ -124,7 +124,53 @@ Dos herramientas que NO comparten memoria automáticamente. Este archivo `CLAUDE
 - **Cowork (chat de escritorio)** → PLANIFICAR e INVESTIGAR: estrategia, investigación
   (precios/tecnología/mercado), documentos, diagramas y PDFs, preparar las visitas al lab.
   Además mantiene este `CLAUDE.md` al día.
-- **Regla:** toda decisión importante se escribe acá (o en una carpeta `docs/`). Al terminar
-  una sesión en Claude Code, actualizá este archivo con lo que cambió, así la próxima sesión
-  —en cualquiera de las dos— arranca al día.
-- **Idioma:** todo en español.
+- **Regla:** toda decisión importante se escribe acá (o 
+## Tarea actual (fin de semana, jul 2026) — Arrancar el backend, PASO A PASO
+
+> **IMPORTANTE para Claude Code:** Francisco está aprendiendo bases de datos e
+> infraestructura (programa en JS/Node, nivel principiante/intermedio). Al ejecutar esta
+> tarea, **explicá cada paso en lenguaje simple, de a UNO por vez, y esperá que confirme
+> antes de seguir.** No tires todos los comandos juntos. Enseñá el concepto detrás de cada
+> paso (qué es PostgreSQL, qué es un endpoint, qué es una variable de entorno, etc.). El
+> objetivo es que Francisco **entienda**, no solo que funcione.
+
+**Objetivo del finde:** dar los primeros pasos del backend + la base de datos, SIN depender
+de la 2ª visita al lab. Lo que necesita datos del lab (parámetros reales de cada ensayo,
+formato exacto del informe) queda como **placeholder** — no inventar.
+
+**Regla de orden:** primero la base, después la API, después conectar UNA sola pantalla.
+No avanzar a lo que depende del lab.
+
+### Paso 1 — PostgreSQL andando en la PC
+1. Instalar PostgreSQL (explicarle qué es: el motor donde viven los datos).
+2. Crear la base: `createdb zeng`.
+3. Cargar el esquema: `psql -d zeng -f db/zeng_esquema_v1.sql`.
+4. Verificar que se crearon las 8 tablas (`\dt` dentro de psql) y explicar para qué es cada una.
+
+### Paso 2 — Datos de prueba (seed)
+1. Insertar unos clientes conocidos (de las capturas: ej. 439, 297, 026 A).
+2. Insertar el ensayo `138 = Enterobacterias` con sus parámetros conocidos.
+   (El resto de ensayos/parámetros quedan pendientes de la 2ª visita — NO inventar nombres.)
+3. Mostrarle cómo consultar los datos con un `SELECT` simple.
+
+### Paso 3 — Backend mínimo en Node
+1. Crear una carpeta para el backend (ej. `api/` o `server/`) e iniciar el proyecto Node
+   (explicar `package.json` y `npm`).
+2. Instalar **Express** y el cliente de Postgres (**`pg`**). Explicar qué hace cada uno.
+3. Conectar a la base. Explicar la cadena de conexión y por qué la contraseña NO va en el
+   código, sino en una variable de entorno (`.env`, que ya está en `.gitignore`).
+4. Crear los primeros endpoints: `GET /clientes`, `POST /clientes`, `GET /muestras`,
+   `POST /muestras`. En `POST /muestras`, implementar la lógica del **número de muestra
+   global** (+1, el contador que comparten las 3 etapas).
+5. Probar los endpoints y explicar qué es una API y un endpoint.
+
+### Paso 4 — Conectar la pantalla "Ingreso de Muestra"
+1. Hacer que `web/src/pages/IngresoMuestra.tsx` guarde de verdad en la base vía la API
+   (reemplazar el mock SOLO de esa pantalla).
+2. Que la tabla de "muestras recientes" liste los datos reales.
+3. Resultado: la **etapa 1 funciona de punta a punta** (frontend → API → base).
+
+**Si no llegás a todo:** con el Paso 1 (base andando) ya es un finde bien aprovechado.
+Ir de a poco, entendiendo cada cosa.
+
+Al terminar la sesión, actualizar `PARA_COWORK.md` con lo que se hizo.
