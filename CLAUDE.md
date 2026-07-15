@@ -124,53 +124,43 @@ Dos herramientas que NO comparten memoria automáticamente. Este archivo `CLAUDE
 - **Cowork (chat de escritorio)** → PLANIFICAR e INVESTIGAR: estrategia, investigación
   (precios/tecnología/mercado), documentos, diagramas y PDFs, preparar las visitas al lab.
   Además mantiene este `CLAUDE.md` al día.
-- **Regla:** toda decisión importante se escribe acá (o 
-## Tarea actual (fin de semana, jul 2026) — Arrancar el backend, PASO A PASO
+- **Regla:** toda decisión importante se escribe acá (o
 
-> **IMPORTANTE para Claude Code:** Francisco está aprendiendo bases de datos e
-> infraestructura (programa en JS/Node, nivel principiante/intermedio). Al ejecutar esta
-> tarea, **explicá cada paso en lenguaje simple, de a UNO por vez, y esperá que confirme
-> antes de seguir.** No tires todos los comandos juntos. Enseñá el concepto detrás de cada
-> paso (qué es PostgreSQL, qué es un endpoint, qué es una variable de entorno, etc.). El
-> objetivo es que Francisco **entienda**, no solo que funcione.
+## Tarea actual (jul 2026) — Etapa 2: Carga de Resultados, PASO A PASO
 
-**Objetivo del finde:** dar los primeros pasos del backend + la base de datos, SIN depender
-de la 2ª visita al lab. Lo que necesita datos del lab (parámetros reales de cada ensayo,
-formato exacto del informe) queda como **placeholder** — no inventar.
+> **IMPORTANTE para Claude Code:** Francisco está aprendiendo bases de datos e infraestructura.
+> **Explicá cada paso en lenguaje simple, de a UNO por vez, esperá que confirme antes de seguir,
+> y enseñá el concepto detrás.** El objetivo es que ENTIENDA, no solo que funcione.
 
-**Regla de orden:** primero la base, después la API, después conectar UNA sola pantalla.
-No avanzar a lo que depende del lab.
+**Ya hecho (fin de semana jul 2026):** PostgreSQL + esquema + `db/seed.sql`; backend `api/`
+(Node/Express + `pg`) con endpoints de clientes/usuarios/ensayos/muestras y la lógica del
+**número de muestra global**; y la **etapa 1 (Ingreso de Muestra) conectada de punta a punta**.
 
-### Paso 1 — PostgreSQL andando en la PC
-1. Instalar PostgreSQL (explicarle qué es: el motor donde viven los datos).
-2. Crear la base: `createdb zeng`.
-3. Cargar el esquema: `psql -d zeng -f db/zeng_esquema_v1.sql`.
-4. Verificar que se crearon las 8 tablas (`\dt` dentro de psql) y explicar para qué es cada una.
+**Objetivo ahora:** conectar la **etapa 2 (Carga de Resultados)** de punta a punta, usando los
+parámetros de placeholder. (El mapeo real ensayo → parámetros y el formato del informe siguen
+esperando la 2ª visita — NO inventar nombres.)
 
-### Paso 2 — Datos de prueba (seed)
-1. Insertar unos clientes conocidos (de las capturas: ej. 439, 297, 026 A).
-2. Insertar el ensayo `138 = Enterobacterias` con sus parámetros conocidos.
-   (El resto de ensayos/parámetros quedan pendientes de la 2ª visita — NO inventar nombres.)
-3. Mostrarle cómo consultar los datos con un `SELECT` simple.
+**Regla de orden:** seguir el flujo real: Entrada (listo) → **Resultados (esto)** → Informe (después).
 
-### Paso 3 — Backend mínimo en Node
-1. Crear una carpeta para el backend (ej. `api/` o `server/`) e iniciar el proyecto Node
-   (explicar `package.json` y `npm`).
-2. Instalar **Express** y el cliente de Postgres (**`pg`**). Explicar qué hace cada uno.
-3. Conectar a la base. Explicar la cadena de conexión y por qué la contraseña NO va en el
-   código, sino en una variable de entorno (`.env`, que ya está en `.gitignore`).
-4. Crear los primeros endpoints: `GET /clientes`, `POST /clientes`, `GET /muestras`,
-   `POST /muestras`. En `POST /muestras`, implementar la lógica del **número de muestra
-   global** (+1, el contador que comparten las 3 etapas).
-5. Probar los endpoints y explicar qué es una API y un endpoint.
+### Paso 1 — Backend: leer los análisis pendientes
+1. Endpoint `GET /analisis/pendientes`: devolver los análisis en estado `'pendiente'` con datos de
+   la muestra (N° interno, cliente, descripción) y del ensayo (código, nombre).
+2. Traer también los **parámetros** de cada ensayo (de la tabla `parametros`), ya sea en ese
+   endpoint o en uno aparte `GET /ensayos/:id/parametros`.
 
-### Paso 4 — Conectar la pantalla "Ingreso de Muestra"
-1. Hacer que `web/src/pages/IngresoMuestra.tsx` guarde de verdad en la base vía la API
-   (reemplazar el mock SOLO de esa pantalla).
-2. Que la tabla de "muestras recientes" liste los datos reales.
-3. Resultado: la **etapa 1 funciona de punta a punta** (frontend → API → base).
+### Paso 2 — Backend: guardar los resultados
+1. Endpoint `POST /analisis/:id/resultados`: recibir fecha/hora de siembra, analista, revisor y la
+   lista de valores por parámetro. Guardar en la tabla `resultados` (un `INSERT` por parámetro) y
+   pasar el análisis a estado `'cargado'`.
+2. Respetar el `UNIQUE (analisis_id, parametro_id)` (no cargar dos veces el mismo parámetro).
 
-**Si no llegás a todo:** con el Paso 1 (base andando) ya es un finde bien aprovechado.
-Ir de a poco, entendiendo cada cosa.
+### Paso 3 — Frontend: conectar `web/src/pages/CargaResultados.tsx`
+1. Que la lista lateral traiga los **análisis pendientes reales** (del endpoint nuevo).
+2. Al seleccionar uno, cargar sus **parámetros reales** y permitir escribir el `valor` y la
+   `lectura_dilución` de cada uno.
+3. Al guardar, llamar al `POST` y que el análisis desaparezca de "pendientes".
+4. Resultado: **etapa 2 funciona de punta a punta** (pantalla → API → base).
 
-Al terminar la sesión, actualizar `PARA_COWORK.md` con lo que se hizo.
+**Si no llegás a todo:** con el backend (pasos 1 y 2) andando ya es un gran avance.
+
+Al terminar la sesión, **actualizá `PARA_COWORK.md`** con lo que hiciste (la última vez quedó sin actualizar).

@@ -10,135 +10,205 @@
 
 ---
 
-## Sesión anterior — 11 jul 2026
+## Sesión anterior — 11 jul 2026 (mañana)
 
-### 1. Reorganización de carpetas
+### Pantalla intro splash — estado final
 
-El repo estaba todo en la raíz. Se movió a estructura limpia con `git mv`
-(historial preservado):
+- Logo real ZENG (`web/public/logo.png`, PNG fondo transparente) girando con efecto 3D
+- Animación de textos: efecto telescopio (apertura de iris `clip-path: circle()` + blur + letter-spacing)
+- Textos grandes: "BIENVENIDO, FRANCISCO" (`text-5xl`) + "LABORATORIO MICROBIOLÓGICO" (`text-xl`)
+- Fondo navy, 2 giros, misma curva de easing en zoom y rotación → frenan juntos
+- Archivos: `web/src/components/Intro.tsx`, `web/src/index.css`
+
+---
+
+## Última sesión — 11 jul 2026 (noche) — BACKEND ARRANCADO
+
+### Resumen ejecutivo
+
+**Se completaron los 4 pasos del roadmap del finde.** El stack completo funciona de punta a punta:
 
 ```
-ZENG/
-├── CLAUDE.md
-├── README.md
-├── PARA_COWORK.md          ← este archivo (nuevo)
-├── db/
-│   └── zeng_esquema_v1.sql
-├── docs/
-│   ├── ZENG - Relevamiento del Sistema Actual.pdf
-│   ├── ZENG - Checklist 2a visita.pdf
-│   ├── ZENG - Estado del proyecto.pdf
-│   ├── guia_relevamiento_ZENG.docx
-│   └── Proyecto_ZENG_Innovacion_Laboratorios.pdf
-└── web/                    ← frontend React (ver abajo)
+Navegador (React) → Node.js (Express API) → PostgreSQL
 ```
 
-### 2. Frontend — pantallas terminadas
+Una muestra ingresada desde el navegador queda guardada en la base de datos real.
 
-**Stack:** Vite + React 19 + TypeScript + Tailwind CSS v4 + Radix UI (estilo shadcn/ui propio). Sin CDNs externos (lab offline).
+---
 
-| Pantalla | Archivo | Estado |
-|---|---|---|
-| Panel (dashboard) | `web/src/pages/Panel.tsx` | ✅ Hecho |
-| Ingreso de Muestra | `web/src/pages/IngresoMuestra.tsx` | ✅ Hecho + mejorado |
-| Carga de Resultados | `web/src/pages/CargaResultados.tsx` | ✅ Nuevo |
-| Cuaderno de Análisis | `web/src/pages/CuadernoAnalisis.tsx` | ✅ Nuevo |
-| Clientes | — | ⏳ Placeholder |
-| Ensayos y Parámetros | — | ⏳ Placeholder |
+### Paso 1 — PostgreSQL instalado ✅
+
+- PostgreSQL 18.4 instalado en Windows (puerto 5432)
+- Usuario: `postgres`
+- Base creada: `zeng`
+- Esquema cargado: `psql -U postgres -d zeng -f db/zeng_esquema_v1.sql` → 8 tablas + 5 índices
+
+**Nota importante:** `psql` no queda en el PATH automáticamente en Windows. Hay que agregar manualmente a cada sesión de PowerShell:
+```powershell
+$env:Path = $env:Path + ";C:\Program Files\PostgreSQL\18\bin"
+```
+O reiniciar VS Code para que tome el PATH persistido.
+
+---
+
+### Paso 2 — Datos de prueba cargados ✅
+
+Archivo: `db/seed.sql` (nuevo, commiteado)
+
+Datos insertados:
+- **4 clientes**: 439, 297, 026 A, 100
+- **4 usuarios**: sv, dq, fr, dg
+- **1 ensayo confirmado**: `138 = Enterobacterias`
+- **1 parámetro**: Enterobacterias (ufc/g, código 0052)
+
+Para recargar en caso de necesidad: `psql -U postgres -d zeng -f db/seed.sql`
+
+---
+
+### Paso 3 — Backend Node.js ✅
+
+Carpeta: `api/` (nueva)
+
+**Stack:** Node.js + Express 5 + pg + dotenv
 
 **Cómo correrlo:**
 ```bash
-cd web && npm run dev
+cd api
+npm run dev
+# → Servidor ZENG corriendo en http://localhost:3001
 ```
 
-### 3. Mejoras de diseño (sesión UI/UX)
+**Endpoints disponibles:**
 
-- Transición de página: fade + slide 7px, 220ms, curva iOS. Respeta `prefers-reduced-motion`.
-- Botones: `active:scale-[0.97]` — feedback físico de "press".
-- Sidebar: logo teal con sombra de color, íconos con color activo, avatar con gradiente.
-- Formularios: `type="date"` y `type="time"` nativos, campos obligatorios marcados, textarea para observaciones.
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/clientes` | Lista todos los clientes |
+| POST | `/clientes` | Crea un cliente nuevo |
+| GET | `/usuarios` | Lista todos los usuarios/analistas |
+| GET | `/ensayos` | Lista todos los ensayos |
+| GET | `/muestras` | Lista muestras con cliente, ensayos y estado |
+| POST | `/muestras` | Crea muestra + analisis por cada ensayo seleccionado |
+
+**Detalle importante de `POST /muestras`:**
+- Calcula el `numero_interno` global automáticamente (MAX + 1, arranca desde 228000)
+- Recibe `ensayo_ids[]` y crea una fila en `analisis` por cada uno, en estado `pendiente`
+- Cuerpo esperado: `{ cliente_id, descripcion, fecha_entrada, hora_entrada, fecha_muestreo, recibido_por, observaciones, ensayo_ids }`
+
+**Archivo de configuración:** `api/.env` (NO está en git, cubierto por `.gitignore`)
+```
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=zeng
+DB_USER=postgres
+DB_PASSWORD=<contraseña local>
+```
 
 ---
 
-## Última sesión — 11 jul 2026 (continuación)
+### Paso 4 — Ingreso de Muestra conectado a la API ✅
 
-### 4. Pantalla de intro (splash screen) — estado final
+Archivo: `web/src/pages/IngresoMuestra.tsx` (reescrito)
 
-La pantalla de bienvenida está completamente terminada en:
-- `web/src/components/Intro.tsx`
-- `web/src/index.css` (keyframes)
-- `web/public/logo.png` (logo real del laboratorio, PNG con fondo transparente)
+**Lo que cambió:**
+- Ya no hay datos hardcodeados. Todo viene de la API en tiempo real.
+- Al cargar la pantalla hace 4 llamadas en paralelo: `/clientes`, `/usuarios`, `/ensayos`, `/muestras`
+- El formulario es controlado (cada campo tiene su `useState`)
+- "Guardar muestra" llama a `POST /muestras` y refresca la tabla automáticamente
+- La tabla muestra muestras reales con número interno, cliente, descripción, ensayos y estado
+- El buscador filtra por número o nombre de cliente en tiempo real (sin llamada a la API)
 
-#### Cómo funciona la secuencia
+**CORS:** el backend tiene middleware CORS que permite llamadas desde `localhost:5173`.
 
-| Tiempo | Qué pasa |
+---
+
+### Estado actual del proyecto
+
+| Componente | Estado |
 |---|---|
-| 0s | Logo ZENG real aparece desde el centro: zoom desde scale(8) + 2 giros rotateY |
-| ~4.5s | Logo frena y queda quieto en posición final |
-| 4.2s | Línea separadora se expande de izquierda a derecha (scaleX) |
-| 4.4s | "BIENVENIDO, FRANCISCO" aparece con efecto telescopio |
-| 5.0s | "LABORATORIO MICROBIOLÓGICO" aparece con efecto telescopio |
-| 7.5s | Pantalla empieza a desvanecerse (opacity-0) |
-| 8.5s | Panel carga |
+| PostgreSQL local | ✅ Andando |
+| Esquema (8 tablas) | ✅ Cargado |
+| Datos de prueba | ✅ Cargados |
+| Backend API (Node) | ✅ Corriendo en :3001 |
+| Frontend (React) | ✅ Corriendo en :5173 |
+| Etapa 1 — Ingreso de Muestra | ✅ Conectada a la base real |
+| Etapa 2 — Carga de Resultados | ✅ Conectada a la base real |
+| Etapa 3 — Cuaderno de Análisis | ⏳ Todavía mock |
+| Informe de Ensayo PDF | ⏳ Pendiente 2ª visita |
 
-#### Efecto telescopio (lo más importante)
+---
 
-Los textos de bienvenida tienen una animación personalizada que simula mirar a través de un telescopio:
+### Lo que falta / próximos pasos sugeridos
 
-1. **Apertura de iris** — `clip-path: circle(0%)` → `circle(200%)`: el texto emerge desde un punto central como el diafragma de un lente abriéndose.
-2. **Enfoque desde lejos** — `filter: blur(14px)` → `blur(0)` + `scale(0.6)` → `scale(1)`: como cuando ajustás el foco de un telescopio y el objeto va apareciendo nítido.
-3. **Letras que convergen** — `letter-spacing: 1em` → `0.25em`: las letras arrancan muy separadas y se juntan, como si vinieran desde la distancia.
+1. **Conectar Cuaderno de Análisis** (Etapa 3) — requiere endpoints de informes
+2. **Pantallas Clientes y Ensayos** — gestión del catálogo (alta/baja de clientes y ensayos)
+3. **2ª visita al laboratorio** — traer el mapeo ensayo→parámetros real, formato del informe, credenciales del SQL Server actual
+4. **PATH permanente de psql** — configurar en Windows para no tener que setearlo cada sesión
 
-```css
-/* En web/src/index.css */
-@keyframes intro-telescopio {
-  0%   { clip-path: circle(0% at 50% 50%); transform: scale(0.6); filter: blur(14px); letter-spacing: 1em; opacity: 0; }
-  18%  { opacity: 1; }
-  100% { clip-path: circle(200% at 50% 50%); transform: scale(1); filter: blur(0); letter-spacing: 0.25em; opacity: 1; }
-}
+---
+
+## Sesión — 15 jul 2026 — ETAPA 2 CONECTADA
+
+### Resumen ejecutivo
+
+**Etapa 2 (Carga de Resultados) funciona de punta a punta.** El stack completo de las dos primeras etapas está activo:
+
+```
+Navegador → Node.js API → PostgreSQL
+  Etapa 1: Ingreso de Muestra ✅
+  Etapa 2: Carga de Resultados ✅
 ```
 
-#### Animación del logo
+### Backend — 3 endpoints nuevos en `api/index.js`
 
-Dos divs anidados con animaciones independientes:
-- **Externo** (`animate-intro-logo-scale`): maneja el zoom `scale(8) → scale(1)` con `cubic-bezier(0.3, 0, 0.1, 1)`.
-- **Interno** (`animate-intro-logo-spin`): maneja la rotación `rotateY(360°) → rotateY(0°)` con la **misma curva**. Usar la misma curva es clave: hace que zoom y giro frenen juntos, entonces cuando el logo deja de girar ya está en posición final (no sigue achicándose después).
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/analisis/pendientes` | Lista análisis en estado `pendiente` con datos de muestra, cliente y ensayo |
+| GET | `/ensayos/:id/parametros` | Devuelve los parámetros de un ensayo (por su `id`) |
+| POST | `/analisis/:id/resultados` | Guarda valores por parámetro, actualiza análisis a `cargado` |
 
-#### Logo real
+**Detalle de `POST /analisis/:id/resultados`:**
+- Actualiza `analisis.estado = 'cargado'` y guarda `fecha_siembra` / `hora_siembra`
+- Por cada parámetro: `INSERT ... ON CONFLICT DO UPDATE` (upsert, se puede guardar dos veces sin duplicar)
+- Cuerpo: `{ fecha_siembra, hora_siembra, analista_id, revisor_id, resultados: [{ parametro_id, valor, lectura_dilucion }] }`
 
-Francisco proveyó el logo real del laboratorio. Se copió a `web/public/logo.png`. Es PNG con fondo transparente, por eso no necesita ningún tratamiento — flota directamente sobre el fondo navy. Se le agrega un `drop-shadow` teal para que resalte:
+### Frontend — `web/src/pages/CargaResultados.tsx` reescrito completo
 
-```tsx
-style={{ filter: "drop-shadow(0 0 24px rgb(15 118 110 / 0.7))" }}
-```
+**Lo que cambió:**
+- Lista lateral izquierda trae análisis pendientes reales del endpoint `GET /analisis/pendientes`
+- Al hacer click en uno: llama `GET /ensayos/:id/parametros` y muestra la tabla de parámetros reales
+- Formulario: fecha de siembra (hoy por defecto), hora, analista y revisor (selects con usuarios reales de la API)
+- Tabla de parámetros con campos `valor` (ej. `<1.0*10(1)`) y `lectura dilución` por cada parámetro
+- Al guardar: llama `POST /analisis/:id/resultados`, y si es OK el análisis **desaparece de la lista** (ya no está pendiente)
+- Sin análisis seleccionado: panel derecho muestra placeholder con ícono de tubo de ensayo
+- Buscador filtra por N° de muestra o nombre de cliente
 
-#### Textos
-
-- "BIENVENIDO, FRANCISCO": `text-5xl font-bold` — muy grande, en teal.
-- "LABORATORIO MICROBIOLÓGICO": `text-xl` — secundario, en `navy-100/50`.
-- `NOMBRE_USUARIO` está hardcodeado como constante en `Intro.tsx` — a futuro se reemplaza por el usuario logueado.
-
----
-
-### 5. Lo que todavía NO está hecho
-
-- **Lógica real**: todo es mock/hardcodeado. Sin conexión a backend ni DB.
-- **Parámetros reales**: los parámetros de cada ensayo son placeholder hasta la 2ª visita.
-- **Formato del informe**: el Informe de Ensayo (etapa 3) no tiene formato real todavía.
-- **Backend**: Node.js + PostgreSQL, sin empezar.
-- **Pantallas Clientes y Ensayos y Parámetros**: placeholders "Próximamente".
-- **Validación de formularios**: no hay validación client-side ni mensajes de error reales.
-- **Login / usuarios reales**: `NOMBRE_USUARIO` es una constante hardcodeada. A futuro el intro debe recibir el nombre del analista que se logueó.
+**Build TypeScript:** sin errores (`npm run build` OK en 1.03s).
 
 ---
 
-### 6. Decisiones técnicas importantes
-
-- **`system-ui` como tipografía**: sin Google Fonts por restricción offline del lab. No cambiar.
-- **Parámetros de ensayo**: `140 / 141 / 142 / 014 / 121` son placeholder. Solo `138 = Enterobacterias` está confirmado. No inventar nombres.
-- **`scale()` en vez de `translateZ`** para el zoom del intro: mucho más performante, la GPU lo maneja sin trabarse. `translateZ` cerca del límite de `perspective` causaba choppiness.
-- **Dos capas para animar**: siempre que se necesite animar dos propiedades con distinto easing (ej. zoom + rotación), usar dos divs anidados — cada uno con su propia animación CSS.
-
 ---
 
-*Actualizado por Claude Code el 11/07/2026.*
+## Estado actual del proyecto (15 jul 2026, tarde)
+
+| Componente | Estado |
+|---|---|
+| PostgreSQL local | ✅ Andando |
+| Esquema (8 tablas) | ✅ Cargado |
+| Datos de prueba | ✅ Cargados |
+| Backend API (Node) | ✅ Corriendo en :3001 |
+| Frontend (React) | ✅ Corriendo en :5173 |
+| Etapa 1 — Ingreso de Muestra | ✅ Funciona de punta a punta |
+| Etapa 2 — Carga de Resultados | ✅ Funciona de punta a punta (validado hoy) |
+| Etapa 3 — Cuaderno de Análisis | ⏳ Todavía mock |
+| Informe de Ensayo PDF | ⏳ Pendiente 2ª visita |
+
+**Francisco va al laboratorio hoy (15 jul) para cerrar los pendientes de la 2ª visita.**
+Ver checklist en `docs/ZENG - Checklist 2a visita.pdf`.
+
+Lo más importante a traer del lab:
+- Mapeo real ensayo → parámetros (cuántos ensayos hay, qué parámetros tiene cada uno)
+- Copia del formato exacto del Informe de Ensayo (para reproducirlo igual en PDF)
+- Acceso a los datos del sistema actual (Access / SQL Server)
+- Info de infraestructura: cuántas PCs, cuál es el servidor, cómo es la red
+
+*Actualizado por Claude Code el 15/07/2026.*
