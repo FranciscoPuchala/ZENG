@@ -138,13 +138,99 @@ app.get("/analisis/pendientes", async (req, res) => {
   res.json(result.rows)
 })
 
-// GET /ensayos/:id/parametros → parámetros de un ensayo
+// GET /ensayos/:id/parametros → parámetros de un ensayo (por id numérico)
+// Usado en CargaResultados al seleccionar un análisis pendiente.
 app.get("/ensayos/:id/parametros", async (req, res) => {
   const result = await pool.query(
-    "SELECT * FROM parametros WHERE ensayo_id = $1 ORDER BY orden, id",
+    `SELECT p.id, p.codigo, p.descripcion AS nombre, p.unidad, p.tipo_valor, ep.orden
+     FROM parametros p
+     JOIN ensayo_parametros ep ON ep.parametro_id = p.id
+     WHERE ep.ensayo_id = $1
+     ORDER BY ep.orden, p.codigo`,
     [req.params.id]
   )
   res.json(result.rows)
+})
+
+// GET /ensayos/:codigo/plantilla → plantilla completa de un ensayo (por código texto)
+// Devuelve { ensayo, parametros[], metodologias[] }.
+// Usado en la futura pantalla de carga donde el analista escribe el código de ensayo.
+app.get("/ensayos/:codigo/plantilla", async (req, res) => {
+  // 1. Buscar el ensayo por código
+  const ensayoRes = await pool.query(
+    "SELECT id, codigo, nombre FROM ensayos WHERE codigo = $1",
+    [req.params.codigo]
+  )
+  if (ensayoRes.rows.length === 0) {
+    return res.status(404).json({ error: "Ensayo no encontrado" })
+  }
+  const ensayo = ensayoRes.rows[0]
+
+  // 2. Traer parámetros y metodologías en paralelo (más rápido que uno por uno)
+  const [paramRes, metodRes] = await Promise.all([
+    pool.query(
+      `SELECT p.id, p.codigo, p.descripcion, p.unidad, p.tipo_valor, ep.orden
+       FROM parametros p
+       JOIN ensayo_parametros ep ON ep.parametro_id = p.id
+       WHERE ep.ensayo_id = $1
+       ORDER BY ep.orden, p.codigo`,
+      [ensayo.id]
+    ),
+    pool.query(
+      `SELECT m.codigo, m.descripcion
+       FROM metodologias m
+       JOIN ensayo_metodologias em ON em.metodologia_id = m.id
+       WHERE em.ensayo_id = $1
+       ORDER BY em.orden, m.codigo`,
+      [ensayo.id]
+    ),
+  ])
+
+  res.json({
+    ensayo,
+    parametros:   paramRes.rows,
+    metodologias: metodRes.rows,
+  })
+})
+
+// GET /analisis/cargados → análisis en estado 'cargado' listos para agrupar en informe
+app.get("/analisis/cargados", async (req, res) => {
+  const result = await pool.query(`
+    SELECT
+      a.id, a.muestra_id, a.ensayo_id,
+      m.numero_interno, m.descripcion, m.fecha_entrada,
+      c.id AS cliente_id, c.nombre AS cliente_nombre, c.numero_cliente,
+      e.codigo AS ensayo_codigo, e.nombre AS ensayo_nombre,
+      a.fecha_siembra
+    FROM analisis a
+    JOIN muestras m ON m.id = a.muestra_id
+    JOIN clientes c ON c.id = m.cliente_id
+    JOIN ensayos  e ON e.id = a.ensayo_id
+    WHERE a.estado = 'cargado'
+    ORDER BY m.numero_interno DESC
+  `)
+  res.json(result.rows)
+})
+
+// POST /informes → crea un informe y pasa los análisis seleccionados a 'publicado'
+app.post("/informes", async (req, res) => {
+  const { cliente_id, numero_informe, fecha_recepcion, fecha_emision, analisis_ids } = req.body
+
+  const informeResult = await pool.query(
+    `INSERT INTO informes (cliente_id, numero_informe, fecha_recepcion, fecha_emision, publicado, fecha_publicado)
+     VALUES ($1, $2, $3, $4, true, CURRENT_DATE) RETURNING *`,
+    [cliente_id, numero_informe, fecha_recepcion || null, fecha_emision || null]
+  )
+  const informe = informeResult.rows[0]
+
+  for (const aid of analisis_ids) {
+    await pool.query(
+      `UPDATE analisis SET informe_id = $1, numero_informe = $2, estado = 'publicado' WHERE id = $3`,
+      [informe.id, numero_informe, aid]
+    )
+  }
+
+  res.status(201).json(informe)
 })
 
 // POST /analisis/:id/resultados → guarda los valores y pasa el análisis a 'cargado'

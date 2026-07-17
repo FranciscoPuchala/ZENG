@@ -1,4 +1,5 @@
 import * as React from "react"
+import { motion } from "motion/react"
 import {
   FlaskConical,
   ClipboardList,
@@ -122,9 +123,14 @@ export function AppShell({
           </div>
         </header>
         <main className="flex-1 overflow-auto p-6">
-          <div key={active} className="animate-page-enter">
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+          >
             {children}
-          </div>
+          </motion.div>
         </main>
       </div>
     </div>

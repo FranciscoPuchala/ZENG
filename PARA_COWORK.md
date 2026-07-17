@@ -211,4 +211,128 @@ Lo más importante a traer del lab:
 - Acceso a los datos del sistema actual (Access / SQL Server)
 - Info de infraestructura: cuántas PCs, cuál es el servidor, cómo es la red
 
-*Actualizado por Claude Code el 15/07/2026.*
+---
+
+## Sesión — 16 jul 2026 — ESQUEMA v2 + PLANTILLA DE ENSAYO
+
+### Resumen ejecutivo
+
+Se completaron los Pasos 1 y 3 de la tarea actual del CLAUDE.md. El Paso 2 (cargar catálogos reales) está bloqueado esperando dos CSVs de Cowork.
+
+### Paso 1 — Esquema v2 ✅
+
+Nuevo archivo: `db/migracion_v2.sql`. Cambios aplicados sobre la base real:
+
+- `parametros` ahora es catálogo standalone: sin `ensayo_id`, con `codigo TEXT UNIQUE`, `descripcion`, `unidad`, `tipo_valor` (`'numerico'` | `'presencia'`)
+- Nueva tabla `metodologias` (id, codigo UNIQUE, descripcion)
+- Nueva tabla `ensayo_parametros` (ensayo_id FK, parametro_id FK, orden, UNIQUE)
+- Nueva tabla `ensayo_metodologias` (ensayo_id FK, metodologia_id FK, orden, UNIQUE)
+- `seed.sql` actualizado para usar el nuevo esquema
+
+Cómo aplicar desde cero:
+```bash
+psql -U postgres -d zeng -f db/migracion_v2.sql
+psql -U postgres -d zeng -f db/seed.sql
+```
+
+### Paso 2 — Cargar catálogos reales ⏳ BLOQUEADO
+
+Esperando de Cowork:
+- `db/seed_ensayos.csv` — 151 ensayos (codigo, nombre)
+- `db/seed_parametros.csv` — 158 parámetros (codigo, descripcion, unidad, tipo_valor)
+
+Ya disponibles en `db/`:
+- `seed_metodologias.csv` ✅
+- `seed_ensayo_parametros.csv` ✅ (376 pares)
+- `seed_ensayo_metodologias.csv` ✅ (283 pares)
+
+### Paso 3 — Endpoint `/plantilla` ✅
+
+Nuevo endpoint en `api/index.js`:
+
+`GET /ensayos/:codigo/plantilla` → devuelve `{ ensayo, parametros[], metodologias[] }`
+
+- Busca el ensayo por **código texto** (no por id numérico)
+- Parámetros: id, codigo, descripcion, unidad, tipo_valor, orden
+- Metodologías: codigo, descripcion
+- Devuelve 404 si el código no existe
+
+También se corrigió el endpoint existente `GET /ensayos/:id/parametros` que estaba roto (usaba `ensayo_id` en `parametros`, columna que ya no existe).
+
+### Paso 4 — Frontend CargaResultados ✅
+
+`web/src/pages/CargaResultados.tsx` actualizado:
+
+- Al seleccionar un análisis, llama a `/ensayos/:codigo/plantilla` en lugar del endpoint viejo
+- Inputs adaptativos por `tipo_valor`:
+  - `numerico` → campo de texto libre (como antes)
+  - `presencia` → botones `-` / `+` (toggle, con color)
+- Botón `×` por fila para eliminar un parámetro que no se realizó en ese caso puntual
+- Lista de metodologías al pie del formulario (solo lectura)
+
+**Validado en la app:** funciona con el parámetro de prueba (0052 Enterobacterias). Cuando lleguen los CSVs y se cargue el catálogo real, todos los ensayos van a mostrar su plantilla completa.
+
+### Estado actual
+
+| Componente | Estado |
+|---|---|
+| Esquema v2 | ✅ Aplicado en la base |
+| Catálogo real (ensayos + parámetros) | ⏳ Esperando CSVs de Cowork |
+| Catálogo metodologías | ✅ CSV disponible, pendiente de cargar con el resto |
+| Endpoint `/plantilla` | ✅ Funcionando |
+| CargaResultados con plantilla | ✅ Funcionando |
+| Etapa 3 — Cuaderno de Análisis | ⏳ Todavía mock |
+
+*Actualizado por Claude Code el 16/07/2026.*
+
+---
+
+## Sesión — 16 jul 2026 (tarde) — ETAPA 3 CONECTADA
+
+### Resumen ejecutivo
+
+**Etapa 3 (Cuaderno de Análisis) funciona de punta a punta.** Las tres etapas del flujo del laboratorio están ahora conectadas a la base de datos real.
+
+### Backend — 2 endpoints nuevos en `api/index.js`
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| GET | `/analisis/cargados` | Lista análisis en estado `cargado` con `cliente_id`, datos de muestra, cliente y ensayo |
+| POST | `/informes` | Crea un informe, marca los análisis seleccionados como `publicado` |
+
+**Detalle de `POST /informes`:**
+- Cuerpo: `{ cliente_id, numero_informe, fecha_recepcion, fecha_emision, analisis_ids[] }`
+- Crea la fila en `informes` con `publicado = true` y `fecha_publicado = CURRENT_DATE`
+- Por cada `analisis_id`: actualiza `informe_id`, `numero_informe` y `estado = 'publicado'`
+
+### Frontend — `web/src/pages/CuadernoAnalisis.tsx` reescrito completo
+
+**Lo que cambió:**
+- Ya no hay datos hardcodeados. La tabla trae análisis reales del endpoint `GET /analisis/cargados`.
+- Al seleccionar un análisis, **se bloquean los de otros clientes** (se grisan y no son seleccionables). Un informe agrupa sólo análisis del mismo cliente.
+- Checkbox de "seleccionar todos" selecciona todos los del cliente activo.
+- Formulario: N° de informe + fecha de recepción + fecha de emisión.
+- "Publicar informe" llama a `POST /informes`; si es OK los análisis **desaparecen de la lista** y aparece un toast animado.
+- Botón deshabilitado si falta N° de informe o fecha de emisión.
+- Placeholder del PDF del informe permanece (pendiente 2ª visita).
+
+**Build TypeScript:** sin errores (`npm run build` OK en 1.09s).
+
+### Estado actual
+
+| Componente | Estado |
+|---|---|
+| Etapa 1 — Ingreso de Muestra | ✅ Funciona de punta a punta |
+| Etapa 2 — Carga de Resultados | ✅ Funciona de punta a punta |
+| Etapa 3 — Cuaderno de Análisis | ✅ Funciona de punta a punta |
+| Catálogo real (ensayos + parámetros) | ⏳ Esperando CSVs de Cowork |
+| Informe de Ensayo PDF | ⏳ Pendiente 2ª visita |
+
+### Lo que falta / próximos pasos sugeridos
+
+1. **Cargar catálogo real** (Paso 2) — en cuanto lleguen `seed_ensayos.csv` y `seed_parametros.csv` de Cowork
+2. **Pantalla Panel** — conectar las 4 stat tiles a datos reales (muestras hoy, pendientes, cargados, publicados)
+3. **Pantallas Clientes y Ensayos** — gestión del catálogo (alta/baja)
+4. **PDF Informe de Ensayo** — después de cerrar el formato en la 2ª visita
+
+*Actualizado por Claude Code el 16/07/2026.*

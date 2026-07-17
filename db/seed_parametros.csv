@@ -1,0 +1,150 @@
+codigo,descripcion,unidad,tipo_valor
+0001,ufc/ml a 37°C / 44 h,,numerico
+0002,ufc/ml a 22°C / 68 h,,numerico
+0003,Coliformes Totales ufc/100 ml,,numerico
+0004,Coliformes Termotolerantes (Fecales) ufc/100 ml,,numerico
+0005,Cloro Residual (ppm),,numerico
+0006,Clasificación,,presencia
+0007,Estreptococos Fecales ufc/100 ml,,numerico
+0008,Clostridios Sulfito Reductores ufc/100 ml,,numerico
+0010,E.coli (ufc/g),,numerico
+0011,Coliformes Totales (ufc/g),,numerico
+0012,Coliformes Fecales (NMP/g),,numerico
+0013,Aerobios Totales (ufc/g),,numerico
+0014,Salmonella spp (en 25 g),,presencia
+0015,Staphylococcus aureus (ufc/cm2),,numerico
+0016,E.coli (ufc/cm2),,numerico
+0017,E.coli (ufc/ml),,numerico
+0018,Coliformes Totales (ufc/ml),,numerico
+0019,Recuentos Totales (ufc/ml),,numerico
+0020,Listeria monocytogenes (en 25 g),,presencia
+0021,Nitritos ppm (mg NaNO2 /Kg de muestra),,numerico
+0023,Pseudomonas aeruginosa (ufc/100 ml),,numerico
+0024,Staphylococcus aureus (ufc/g),,numerico
+0025,Bacillus cereus,,presencia
+0026,Recuentos Totales (ufc/ml),,numerico
+0027,Coliformes Fecales (ufc/ml),,numerico
+0028,Coliformes Totales (NMP/g),,numerico
+0029,Coliformes Totales (ufc/cm2),,numerico
+0030,Aerobios mesófilos (ufc/g),,numerico
+0032,Salmonella spp (en 25 g),,presencia
+0033,Listeria spp (en 3 ml),,presencia
+0034,Nitratos ppm (mg NaNO3 /Kg de muestra),,numerico
+0035,E.coli O157:H7 (en 25 g),,presencia
+0036,Hongos y levaduras (ufc/g),,numerico
+0037,% Grasa,,numerico
+0038,% Humedad,,numerico
+0039,% Proteína,,numerico
+0040,pH,,numerico
+0041,Salmonella spp,,presencia
+0042,Coliformes Fecales (ufc/g),,numerico
+0043,% Cenizas,,numerico
+0044,Plomo ppm (mg Pb/Kg),,numerico
+0045,% NaCl,,numerico
+0046,Pseudomonas spp (ufc/100ml),,numerico
+0047,Recuentos Totales (ufc/cm2),,numerico
+0048,E.coli O145 (en 325g),,presencia
+0049,Clostridios Sulfito Reductores (en 25 g),,presencia
+50,Salmonella spp (en 25 ml),,presencia
+0050,Salmonella spp (cm2),,presencia
+0051,E.coli O157:H7,,presencia
+0052,Enterobacterias (ufc/g),,numerico
+0053,Salmonella spp (en 250 g),,presencia
+0054,E.coli O157:H7 (en 25 g),,presencia
+0055,E.coli O157:H7 (en 325 g),,presencia
+0056,Enterobacterias (ufc/ml),,numerico
+0057,E.coli (ufc/100ml),,numerico
+0058,E.coli STEC screening (en 325 g),,presencia
+0059,Salmonella spp (en 100 cm2),,presencia
+0060,Salmonella spp (en 100 cm2),,presencia
+0061,Shigella (en 25 g),,presencia
+0062,Salmonella spp (en 125 g),,presencia
+0063,Salmonella (en 325 g),,presencia
+0064,Salmonella spp (en 125 g),,presencia
+0065,Enterobacterias (ufc/g),,numerico
+0066,E.coli O157:H7 (en 65g),,presencia
+0067,Heterótrofos (ufc/g),,numerico
+0068,Listeria spp (en 25g),,presencia
+0069,Recuentos Totales (ufc/g),,numerico
+0070,Enterobacterias (ufc/cm2),,numerico
+0071,Salmonella spp (en 25 ml),,presencia
+0072,Salmonella spp (250 ml),,presencia
+0073,Recuentos totales (ufc/ml),,numerico
+0074,Listeria monocytógenes (en 25g),,presencia
+0075,Salmonella spp (en 50g),,presencia
+0076,Enterococos (ufc/100mL),,numerico
+0077,E.coli (ufc/100mL),,numerico
+0078,Salmonella spp (en 400 cm2),,presencia
+0079,listeria monocytogenes (en 3ml),,presencia
+0080,Clostridium Perfringens (ufc/100ml),,numerico
+0081,Clasificación,,presencia
+0082,Listeria monocytogenes (en 25 g),,presencia
+0083,Listeria monocytogenes (en 25 g),,presencia
+0084,Coliformes Termotolerantes (ufc/g),,numerico
+0085,E.coli STEC screening (en 325 g),,presencia
+0086,E.coli O26 (en 325 g),,presencia
+0087,E.coli O45 (en 325 g),,presencia
+0088,E.coli O103 (en 325 g),,presencia
+0089,E.coli O111 (en 325 g),,presencia
+0090,E.coli O121 (en 325g),,presencia
+0091,E.coli O145 (en 325g),,presencia
+0092,Listeria monocytogenes (en 25 mL),,presencia
+0093,Clostridium perfringes (ufc/g),,numerico
+0094,Levaduras (ufc/g),,numerico
+0095,Clostridium sulfito reductores (ufc/g),,numerico
+0096,E.coli STEC (stx) (en 325 g),,presencia
+0097,E.coli STEC (en 325 g),,presencia
+0098,E.coli STEC (stx) (en 325 g),,presencia
+0099,E.coli STEC (eae) (en 325 g),,presencia
+0100,M1 stx (65 g),,presencia
+0101,M1 eae (65 g),,presencia
+0102,M2 stx (65 g),,presencia
+0103,M2 eae (65 g),,presencia
+0104,M3 stx (65 g),,presencia
+0105,M3 eae (65 g),,presencia
+0106,M4 stx (65 g),,presencia
+0107,M4 eae (65 g),,presencia
+0108,M5 stx (65 g),,presencia
+0109,M5 eae (65 g),,presencia
+0110,E.coli O26 (en 65g),,presencia
+0111,E.coli O45 (en 65g),,presencia
+0112,E.coli O103 (en 65g),,presencia
+0113,E.coli O111 (en 65g),,presencia
+0114,E.coli O121 (en 65g),,presencia
+0115,E.coli O145 (en 65g),,presencia
+0116,actividad bactericida,,presencia
+0117,Enterococos (ufc/g),,numerico
+0118,Mesófilos anaerobios facultativos (ufc/g),,numerico
+0119,Bacterias Mesófilas Acido Lácticas (ufc/g),,numerico
+0120,Relación Bacterias Mesófilas Acido Lácticas / Aerobios Mesófilos,,presencia
+0121,Listeria monocytogenes (en 25 mL),,presencia
+0122,E.coli O157:H7 (en 325g),,presencia
+0123,E.coli O157:NM (en 325g),,presencia
+0124,Listeria spp (en 25mL),,presencia
+0125,Calcio (mg/Kg),,numerico
+0126,Coliformes Termotolerantes (ufc/100mL),,numerico
+0127,Salmonella (en 125 g),,presencia
+0128,Recuentos Totales (ufc/mL),,numerico
+0129,E.coli STEC serotipo O (en 325 g),,presencia
+0130,Heterótrofos ufc/mL a 37°C,,numerico
+0131,Pseudomona ufc/100mL,,numerico
+0132,Listeria monocytogenes (en 25 mL),,presencia
+0133,Bacterias ácido lacticas (ufc/g),,numerico
+0134,Pseudomona spp (en 25 g),,presencia
+0135,Coliformes Termotolerantes (Fecales) ufc/100 ml,,numerico
+0136,E.coli (ufc/100mL),,numerico
+0137,Listeria monocytógenes (en 125g),,presencia
+0138,Recuentos Totales (ufc/cm2),,numerico
+0139,"E.coli STEC (stx,eae) (en 325g)",,presencia
+0144,Salmonella spp (en 125 g),,presencia
+0145,Salmonella spp (en 25 g),,presencia
+0146,Salmonella spp (en 25 ml),,presencia
+0150,E.coli O26 (en 325 g),,presencia
+0151,E.coli O45 (en 325 g),,presencia
+0152,E.coli O103 (en 325 g),,presencia
+0153,E.coli O111 (en 325 g),,presencia
+0154,E.coli O121 (en 325g),,presencia
+0155,E.coli O145 (en 325g),,presencia
+0156,E.coli STEC serotipo O (en 325 g),,presencia
+0157,E.coli O157:NM (en 325g),,presencia
+0158,Cloro Libre (ppm),,numerico

@@ -79,15 +79,6 @@
   }
 }
 
-/* ── Transición de página ─────────────────────────────────────────── */
-@keyframes page-enter {
-  from { opacity: 0; transform: translateY(7px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.animate-page-enter {
-  animation: page-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
 /* ── Intro splash ─────────────────────────────────────────────────── */
 /*
    Secuencia en 2 tiempos:
@@ -144,7 +135,7 @@
 .animate-intro-sub2       { animation: intro-telescopio  1.0s cubic-bezier(0.2, 0, 0.1, 1) 5.0s both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-page-enter,
+  /* Intro splash — animaciones CSS */
   .animate-intro-logo-scale,
   .animate-intro-logo-spin,
   .animate-intro-line,
@@ -152,4 +143,6 @@
   .animate-intro-sub2 {
     animation: none;
   }
+  /* Transición de página y animaciones de interacción →
+     manejadas por <MotionConfig reducedMotion="user"> en App.tsx */
 }

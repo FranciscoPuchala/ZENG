@@ -1,6 +1,8 @@
 import * as React from "react"
 import { Plus, X, Search } from "lucide-react"
+import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
+import { Toast } from "@/components/ui/toast"
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
 } from "@/components/ui/card"
@@ -11,7 +13,7 @@ import {
   Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
 } from "@/components/ui/select"
 import {
-  Table, TableHeader, TableRow, TableHead, TableBody, TableCell,
+  Table, TableHeader, TableRow, TableHead, TableCell,
 } from "@/components/ui/table"
 
 // --- Tipos ---
@@ -55,6 +57,7 @@ export function IngresoMuestra() {
   const [ensayosSelec, setEnsayosSelec] = React.useState<number[]>([])
   const [guardando,    setGuardando]    = React.useState(false)
   const [busqueda,     setBusqueda]     = React.useState("")
+  const [toastVisible, setToastVisible] = React.useState(false)
 
   // --- Cargar datos al abrir la pantalla ---
   React.useEffect(() => {
@@ -116,6 +119,7 @@ export function IngresoMuestra() {
         const mu = await fetch(`${API}/muestras`)
         setMuestras(await mu.json())
         limpiarForm()
+        setToastVisible(true)
       }
     } finally {
       setGuardando(false)
@@ -135,6 +139,7 @@ export function IngresoMuestra() {
   }
 
   return (
+    <>
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_1fr]">
       {/* --- Formulario de ingreso --- */}
       <Card className="h-fit">
@@ -280,16 +285,26 @@ export function IngresoMuestra() {
                 <TableHead>Estado</TableHead>
               </TableRow>
             </TableHeader>
-            <TableBody>
+            <motion.tbody className="[&_tr:last-child]:border-0">
               {muestrasFiltradas.length === 0 && (
-                <TableRow>
+                <tr>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     No hay muestras todavía
                   </TableCell>
-                </TableRow>
+                </tr>
               )}
-              {muestrasFiltradas.map(m => (
-                <TableRow key={m.id}>
+              {muestrasFiltradas.map((m, i) => (
+                <motion.tr
+                  key={m.id}
+                  className="border-b border-border transition-colors hover:bg-muted/50"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{
+                    duration: 0.16,
+                    delay: Math.min(i * 0.035, 0.18),
+                    ease: "easeOut",
+                  }}
+                >
                   <TableCell className="font-mono text-xs">{m.numero_interno}</TableCell>
                   <TableCell>
                     <div className="font-medium">{m.cliente_nombre}</div>
@@ -314,12 +329,19 @@ export function IngresoMuestra() {
                       {ESTADO_LABEL[m.estado] ?? m.estado}
                     </Badge>
                   </TableCell>
-                </TableRow>
+                </motion.tr>
               ))}
-            </TableBody>
+            </motion.tbody>
           </Table>
         </CardContent>
       </Card>
     </div>
+
+    <Toast
+      message="Muestra guardada correctamente"
+      visible={toastVisible}
+      onClose={() => setToastVisible(false)}
+    />
+    </>
   )
 }

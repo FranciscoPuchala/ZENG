@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { MotionConfig } from "motion/react"
 import { AppShell } from "@/components/layout/AppShell"
 import { Intro } from "@/components/Intro"
 import { Panel } from "@/pages/Panel"
@@ -25,7 +26,7 @@ function App() {
   const [introHecho, setIntroHecho] = useState(false)
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       {!introHecho && <Intro onDone={() => setIntroHecho(true)} />}
       <AppShell active={active} onNavigate={setActive}>
       {active === "Panel" && <Panel />}
@@ -37,7 +38,7 @@ function App() {
         active !== "Carga de Resultados" &&
         active !== "Cuaderno de Análisis" && <Proximamente nombre={active} />}
     </AppShell>
-    </>
+    </MotionConfig>
   )
 }
 

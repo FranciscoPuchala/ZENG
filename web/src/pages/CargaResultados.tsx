@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Search, ChevronRight, Save, FlaskConical } from "lucide-react"
+import { Search, ChevronRight, Save, FlaskConical, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
@@ -22,24 +22,56 @@ interface Analisis {
   ensayo_codigo: string; ensayo_nombre: string
 }
 interface Parametro {
-  id: number; nombre: string; codigo: string; unidad: string
+  id: number; codigo: string; descripcion: string
+  unidad: string; tipo_valor: "numerico" | "presencia"; orden: number
+}
+interface Metodologia {
+  codigo: string; descripcion: string
 }
 interface Usuario { id: number; iniciales: string; nombre: string }
 
 const API = "http://localhost:3001"
 
-function hoyISO()      { return new Date().toISOString().slice(0, 10) }
+function hoyISO() { return new Date().toISOString().slice(0, 10) }
 function horaAhoraISO() {
   const d = new Date()
   return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`
 }
 
+// Selector -/+ para parámetros de tipo 'presencia'
+function SelectorPresencia({
+  value, onChange,
+}: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-1">
+      {(["-", "+"] as const).map(op => (
+        <button
+          key={op}
+          type="button"
+          onClick={() => onChange(value === op ? "" : op)}
+          className={[
+            "flex h-8 w-10 items-center justify-center rounded-md border text-sm font-semibold transition-colors",
+            value === op && op === "-"
+              ? "border-red-300 bg-red-50 text-red-700"
+              : value === op && op === "+"
+              ? "border-teal-400 bg-teal-50 text-teal-700"
+              : "border-border bg-card text-muted-foreground hover:bg-muted",
+          ].join(" ")}
+        >
+          {op}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function CargaResultados() {
   // --- Datos de la API ---
-  const [pendientes, setPendientes] = React.useState<Analisis[]>([])
-  const [parametros, setParametros] = React.useState<Parametro[]>([])
-  const [usuarios,   setUsuarios]   = React.useState<Usuario[]>([])
-  const [cargando,   setCargando]   = React.useState(true)
+  const [pendientes,    setPendientes]    = React.useState<Analisis[]>([])
+  const [parametros,    setParametros]    = React.useState<Parametro[]>([])
+  const [metodologias,  setMetodologias]  = React.useState<Metodologia[]>([])
+  const [usuarios,      setUsuarios]      = React.useState<Usuario[]>([])
+  const [cargando,      setCargando]      = React.useState(true)
 
   // --- Estado de la pantalla ---
   const [seleccionado, setSeleccionado] = React.useState<Analisis | null>(null)
@@ -70,17 +102,28 @@ export function CargaResultados() {
     cargar()
   }, [])
 
-  // --- Al seleccionar un análisis, cargar sus parámetros ---
+  // --- Al seleccionar un análisis, cargar la plantilla completa del ensayo ---
   async function seleccionar(a: Analisis) {
     setSeleccionado(a)
+    setParametros([])
+    setMetodologias([])
     setValores({})
-    const res = await fetch(`${API}/ensayos/${a.ensayo_id}/parametros`)
-    const params: Parametro[] = await res.json()
-    setParametros(params)
-    // Inicializar valores vacíos para cada parámetro
+
+    const res  = await fetch(`${API}/ensayos/${a.ensayo_codigo}/plantilla`)
+    const data = await res.json()
+
+    setParametros(data.parametros)
+    setMetodologias(data.metodologias)
+
+    // Inicializar valores vacíos por parámetro
     const init: Record<number, { valor: string; lectura: string }> = {}
-    params.forEach(p => { init[p.id] = { valor: "", lectura: "" } })
+    data.parametros.forEach((p: Parametro) => { init[p.id] = { valor: "", lectura: "" } })
     setValores(init)
+  }
+
+  // --- Borrar un parámetro de la lista (no se hizo ese análisis en este caso) ---
+  function eliminarParametro(id: number) {
+    setParametros(prev => prev.filter(p => p.id !== id))
   }
 
   // --- Guardar resultados ---
@@ -93,9 +136,9 @@ export function CargaResultados() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fecha_siembra: fechaSiembra,
-          hora_siembra:  horaSiembra || null,
-          analista_id:   analistaId  ? Number(analistaId)  : null,
-          revisor_id:    revisorId   ? Number(revisorId)   : null,
+          hora_siembra:  horaSiembra  || null,
+          analista_id:   analistaId   ? Number(analistaId) : null,
+          revisor_id:    revisorId    ? Number(revisorId)  : null,
           resultados: parametros.map(p => ({
             parametro_id:     p.id,
             valor:            valores[p.id]?.valor   ?? "",
@@ -104,10 +147,10 @@ export function CargaResultados() {
         }),
       })
       if (res.ok) {
-        // Quitar este análisis de la lista (pasó a 'cargado')
         setPendientes(prev => prev.filter(a => a.id !== seleccionado.id))
         setSeleccionado(null)
         setParametros([])
+        setMetodologias([])
         setValores({})
       }
     } finally {
@@ -204,6 +247,7 @@ export function CargaResultados() {
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
+            {/* Fecha y hora */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="fecha-siembra">
@@ -219,6 +263,7 @@ export function CargaResultados() {
               </div>
             </div>
 
+            {/* Analista y revisor */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="analista">
@@ -268,27 +313,39 @@ export function CargaResultados() {
                         <TableHead className="w-20">Cód.</TableHead>
                         <TableHead className="w-44">Valor</TableHead>
                         <TableHead className="w-36">Lect. dilución</TableHead>
+                        <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {parametros.map(p => (
                         <TableRow key={p.id}>
                           <TableCell>
-                            <div className="text-sm">{p.nombre}</div>
-                            <div className="text-xs text-muted-foreground">{p.unidad}</div>
+                            <div className="text-sm">{p.descripcion}</div>
+                            {p.unidad && (
+                              <div className="text-xs text-muted-foreground">{p.unidad}</div>
+                            )}
                           </TableCell>
                           <TableCell className="font-mono text-xs text-muted-foreground">
                             {p.codigo}
                           </TableCell>
                           <TableCell>
-                            <Input
-                              placeholder='Ej. <1.0*10(1)'
-                              className="h-8 font-mono text-xs"
-                              value={valores[p.id]?.valor ?? ""}
-                              onChange={e => setValores(prev => ({
-                                ...prev, [p.id]: { ...prev[p.id], valor: e.target.value }
-                              }))}
-                            />
+                            {p.tipo_valor === "presencia" ? (
+                              <SelectorPresencia
+                                value={valores[p.id]?.valor ?? ""}
+                                onChange={v => setValores(prev => ({
+                                  ...prev, [p.id]: { ...prev[p.id], valor: v }
+                                }))}
+                              />
+                            ) : (
+                              <Input
+                                placeholder="Ej. <1.0*10(1)"
+                                className="h-8 font-mono text-xs"
+                                value={valores[p.id]?.valor ?? ""}
+                                onChange={e => setValores(prev => ({
+                                  ...prev, [p.id]: { ...prev[p.id], valor: e.target.value }
+                                }))}
+                              />
+                            )}
                           </TableCell>
                           <TableCell>
                             <Input
@@ -300,6 +357,16 @@ export function CargaResultados() {
                               }))}
                             />
                           </TableCell>
+                          <TableCell>
+                            <button
+                              type="button"
+                              title="Quitar parámetro de este análisis"
+                              onClick={() => eliminarParametro(p.id)}
+                              className="flex size-7 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-red-50 hover:text-red-500"
+                            >
+                              <X className="size-3.5" />
+                            </button>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -307,6 +374,23 @@ export function CargaResultados() {
                 </div>
               )}
             </div>
+
+            {/* Metodologías (solo lectura) */}
+            {metodologias.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <Label>Metodologías</Label>
+                <ul className="flex flex-col gap-1 rounded-md border border-border bg-muted/30 px-3 py-2">
+                  {metodologias.map(m => (
+                    <li key={m.codigo} className="flex gap-2 text-xs text-muted-foreground">
+                      <span className="shrink-0 font-mono font-medium text-foreground/70">
+                        {m.codigo}
+                      </span>
+                      <span>{m.descripcion}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </CardContent>
           <CardFooter className="justify-between">
             <p className="text-[11px] text-muted-foreground">* Campos obligatorios</p>

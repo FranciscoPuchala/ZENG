@@ -1,0 +1,152 @@
+codigo,nombre
+01,Potabilidad
+02,Estreptococos Fecales y Clostridios Sulfito Reductores
+03,Determinación de grasas totales
+04,E.coli genérica
+05,Análisis en Producto
+06,Salmonella
+07,"Listeria monocytogenes, Salmonella y E.coli O157:H7"
+08,Análisis de superficie
+09,Microbiológico
+10,Análisis de Listeria monocytogenes
+011,Contenido de Nitritos
+012,Coliformes totales y E.Coli
+013,Análisis Fisicoquímicos
+014,Hongos y Levaduras
+015,Pseudomona aeruginosa
+016,Staphylococcus aureus
+17,Contenido de Nitritos y Nitratos
+18,Salmonella
+19,Salmonella y E.coli O157:H7
+20,Aerobios Mesófilos (ufc/g)
+21,E.coli genérica (ufc/cm2)
+22,Microbiológico
+23,Salmonella kit rápido (325 g)
+24,Clostridios Sulfito Reductores
+25,Recuentos Totales y Coliformes Totales
+26,Agua Cruda
+27,Análisis de Superficie
+28,Salmonella
+29,E.Coli
+30,Listeria Ambiental
+31,Contenido de Nitratos
+32,Parámetros Nutricionales
+33,Microbiológico
+34,Control de Agua Destilada
+35,Microbiológico
+36,Plomo
+37,Recuentos Totales y Coliformes Totales
+38,E.coli O157:H7
+39,Microbiológico
+40,Salmonella
+41,E.coli DILAVE (interlaboratorio)
+42,E.coli O157:H7 (hisopos)
+43,Estreptococos Fecales
+44,Salmonella
+45,"Recuentos Totales, Enterobacterias y E.coli"
+46,Salmonella spp
+47,E.coli O157:H7 - Salmonella spp
+48,E.coli O157:H7
+49,Enterobacterias
+50,Enterobacterias
+51,Salmonella
+52,Salmonella
+53,"E.coli O157:H7 (InmunoSeparación, Intralaboratorio)"
+54,"Salmonella, Enterobacterias y Heterótrofos"
+55,"Salmonella, Enterobacterias y Heterótrofos"
+56,Enterobacterias y Heterótrofos
+57,Enterobacterias y Heterótrofos
+58,E.coli O157:H7 (Inmunoseparación)
+59,Recuentos Totales (ufc/g)
+60,E.coli O157:H7
+61,E.coli O157:H7
+62,Salmonella ISO Intralaboratorio
+63,Potabilidad Intralaboratorio
+64,E.coli O157:H7
+65,Listeria spp.
+66,Análisis microbiológico
+67,Análisis de superficie
+68,Análisis de superficie
+69,Análisis microbiológico
+70,Análisis microbiológico
+71,Enterobacterias y Heterótrofos
+72,Listeria monocytogenes
+73,Listeria monocytogenes
+74,Enterococos
+75,E.coli
+76,Potabilidad
+77,Listeria monocytogenes Ambiental
+78,"Enterococos, Estreptococos Fecales, Clostridios Sulfito Reductores y Clostridium perfringens"
+79,Potabilidad
+80,Listeria monocytogenes
+81,Coliformes Termotolerantes
+82,Coliformes Totales y Termotolerantes
+83,E.coli STEC
+84,Plaguicidas
+85,Listeria monocytogenes
+86,Clostridium Perfringens
+87,Levaduras
+88,Clostridium Sulfito Reductores
+89,E.coli STEC (stx)
+90,E.coli STEC
+91,E.coli STEC serogrupos
+92,Evaluación de la actividad bactericida
+93,Listeria monocytogenes y Salmonella
+94,Clostridium perfringens (ufc/g)
+95,Salmonella spp
+96,E.coli STEC
+97,Enterococos y Clostridios Sulfito Reductores
+98,Bacterias Mesófilas Ácido Lácticas
+99,Análisis Microbiológico
+100,E.coli O157
+101,E.coli O157
+102,E.coli STEC
+103,E.coli STEC
+104,Listeria monocytogenes
+105,E.coli O157:H7
+106,E.coli O157:NM
+107,E.coli O157:H7 E.coli O157:NM
+108,Salmonella
+109,Análisis Microbiológico
+110,Salmonella
+111,Análisis Microbiológico
+112,Recuentos de aerobios y E.coli
+113,Recuentos de aerobios y E.coli
+114,E.coli STEC
+115,Recuentos Totales (ufc/mL)
+116,Heterótrofos (ufc/mL)
+117,Listeria monocytogenes
+118,Parámetros microbiológicos de agua
+119,Enterobacterias y Heterótrofos
+120,Análisis microbiológico
+121,Potabilidad
+122,"Recuentos de aerobios, Enterobacterias y E.coli"
+123,Análisis Microbiológico
+124,Análisis Microbiológico
+125,Potabilidad
+126,Análisis Microbiológico
+127,"Salmonella, Enterobacterias, Heterótrofos, Listeria"
+128,"Salmonella, Enterobacterias, Heterótrofos, Listeria"
+129,Salmonella y Listeria
+130,"Salmonella, Enterobacterias, Heterótrofos, Listeria"
+131,"Salmonella, Enterobacterias, Heterótrofos, Listeria"
+132,Salmonella y Listeria
+133,Enterobacterias y Heterótrofos
+134,Salmonella spp
+135,"Enterobacterias, Aerobios y Ecoli"
+136,Análisis de Listeria monocytogenes 125g
+137,Enterobacterias y Heterótrofos
+138,Enterobacterias
+139,E.coli STEC Gene (stx;eae)
+140,E.coli STEC
+141,E.coli O157:H7
+142,Salmonella
+143,Salmonella
+144,"E.coli STEC, serogrupos"
+145,Salmonella spp
+146,E.coli STEC Gene (stx)
+147,E.coli STEC Gene (stx)
+148,"Salmonella, Enterobacterias, Heterótrofos, Listeria"
+149,E.coli O157:NM
+150,Análisis Microbiológico
+151,Cloro Libre

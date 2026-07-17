@@ -77,6 +77,7 @@ respuestas — el informe/reporte de ficha exactos sí van a esperar a la 2ª vi
 - **Carpeta:** `web/` — proyecto Vite + React 19 + TypeScript, independiente del backend.
 - **Stack de UI:** Tailwind CSS v4 + componentes propios estilo shadcn/ui (Radix UI +
   class-variance-authority) en `web/src/components/ui/`. Iconos: lucide-react.
+  Animaciones: **motion** (Framer Motion) instalado vía npm (sin CDN, 100% offline).
 - **Paleta:** navy (`#16324f`) + teal (`#0f766e`), tomada de la identidad que ya tiene el
   Informe de Ensayo actual (banda superior navy, acentos teal) — para que la app nueva se
   sienta de la misma marca. Tokens en `web/src/index.css` (`@theme`).
@@ -94,6 +95,18 @@ respuestas — el informe/reporte de ficha exactos sí van a esperar a la 2ª vi
 - **Datos:** todo hardcodeado/mock. Ensayos 140/141/142/014/121 son placeholders —
   sólo 138 = Enterobacterias está confirmado. Parámetros de cada ensayo también son
   placeholder hasta la 2ª visita al lab.
+- **Animaciones de interacción** (jul 2026, agregadas con `motion`):
+  - Transición de página: fade + deslizamiento sutil al cambiar de sección (AppShell,
+    `motion.div key={active}`). Reemplazó la animación CSS anterior.
+  - Botones: `active:scale-[0.97] active:opacity-90` (CSS, sin motion — más liviano).
+  - Focus de inputs: `transition-all duration-150` — el ring teal aparece suavemente.
+  - Filas de tabla (IngresoMuestra): entrada escalonada con `motion.tr`, delay máximo
+    capado en 180ms para que no se sienta lenta en listas largas.
+  - Toast animado (`web/src/components/ui/toast.tsx`): sube desde abajo al guardar
+    una muestra, se cierra solo a los 3.5s, tiene `aria-live="polite"`.
+  - `<MotionConfig reducedMotion="user">` en App.tsx: todas las animaciones de motion
+    se deshabilitan automáticamente si el usuario tiene "reducir movimiento" activado
+    en el sistema operativo.
 - **Cómo correrlo:** `cd web && npm install && npm run dev`. `npm run build` para verificar
   que compila (ya validado en jul 2026, sin errores de tipos).
 - **Pendiente:** validar las 3 pantallas con Francisco, conectar al backend (Node +
@@ -126,41 +139,48 @@ Dos herramientas que NO comparten memoria automáticamente. Este archivo `CLAUDE
   Además mantiene este `CLAUDE.md` al día.
 - **Regla:** toda decisión importante se escribe acá (o
 
-## Tarea actual (jul 2026) — Etapa 2: Carga de Resultados, PASO A PASO
+## Tarea actual (jul 2026) — Catálogos reales + "plantilla por código de ensayo", PASO A PASO
 
 > **IMPORTANTE para Claude Code:** Francisco está aprendiendo bases de datos e infraestructura.
-> **Explicá cada paso en lenguaje simple, de a UNO por vez, esperá que confirme antes de seguir,
-> y enseñá el concepto detrás.** El objetivo es que ENTIENDA, no solo que funcione.
+> Explicá cada paso simple, de a UNO, esperá que confirme, y enseñá el concepto detrás. Que
+> ENTIENDA, no solo que funcione.
 
-**Ya hecho (fin de semana jul 2026):** PostgreSQL + esquema + `db/seed.sql`; backend `api/`
-(Node/Express + `pg`) con endpoints de clientes/usuarios/ensayos/muestras y la lógica del
-**número de muestra global**; y la **etapa 1 (Ingreso de Muestra) conectada de punta a punta**.
+**Contexto (relevado en la visita, 16 jul 2026):** el **código de ensayo es una PLANTILLA**. Al
+escribir el código, la app debe traer **solos** los **parámetros a rellenar** (los resultados) y
+las **metodologías** de ese código. **Nada es editable**, salvo **borrar** un parámetro que en un
+caso puntual no se hizo (las metodologías se mantienen). Los parámetros tienen dos **tipos de
+valor**: **numérico** o **presencia** (`-`/`+`, "incluye o no incluye").
 
-**Objetivo ahora:** conectar la **etapa 2 (Carga de Resultados)** de punta a punta, usando los
-parámetros de placeholder. (El mapeo real ensayo → parámetros y el formato del informe siguen
-esperando la 2ª visita — NO inventar nombres.)
+**Datos ya extraídos por Cowork (en `db/`, del Word + Excel del lab):**
+- `seed_metodologias.csv` — catálogo de 68 metodologías (código, descripción).
+- `seed_ensayo_parametros.csv` — qué parámetros tiene cada ensayo (376 pares): codigo_ensayo, codigo_parametro, orden.
+- `seed_ensayo_metodologias.csv` — qué metodologías tiene cada ensayo (283 pares).
+- Fuentes originales en `db/fuentes/`.
+- PENDIENTE (los genera Cowork): `seed_ensayos.csv` (código→nombre, 151) y `seed_parametros.csv` (código→descripción, unidad, tipo_valor, 158).
 
-**Regla de orden:** seguir el flujo real: Entrada (listo) → **Resultados (esto)** → Informe (después).
+**Modelo:** parámetros y metodologías son **dos listas separadas** por código (no van apareadas).
 
-### Paso 1 — Backend: leer los análisis pendientes
-1. Endpoint `GET /analisis/pendientes`: devolver los análisis en estado `'pendiente'` con datos de
-   la muestra (N° interno, cliente, descripción) y del ensayo (código, nombre).
-2. Traer también los **parámetros** de cada ensayo (de la tabla `parametros`), ya sea en ese
-   endpoint o en uno aparte `GET /ensayos/:id/parametros`.
+### Paso 1 — Ajustar el esquema (nueva migración en db/)
+- Nueva tabla **`metodologias`** (id, codigo TEXT UNIQUE, descripcion TEXT).
+- **`parametros`**: quitar `ensayo_id`; queda catálogo standalone (id, codigo TEXT UNIQUE, descripcion TEXT, unidad TEXT, **tipo_valor** TEXT CHECK IN ('numerico','presencia') DEFAULT 'numerico').
+- Nueva **`ensayo_parametros`** (id, ensayo_id FK, parametro_id FK, orden INT, UNIQUE(ensayo_id, parametro_id)).
+- Nueva **`ensayo_metodologias`** (id, ensayo_id FK, metodologia_id FK, orden INT, UNIQUE(ensayo_id, metodologia_id)).
+- Actualizar el `seed.sql` viejo (ataba el parámetro 0052 por `ensayo_id` — ahora va por el join).
 
-### Paso 2 — Backend: guardar los resultados
-1. Endpoint `POST /analisis/:id/resultados`: recibir fecha/hora de siembra, analista, revisor y la
-   lista de valores por parámetro. Guardar en la tabla `resultados` (un `INSERT` por parámetro) y
-   pasar el análisis a estado `'cargado'`.
-2. Respetar el `UNIQUE (analisis_id, parametro_id)` (no cargar dos veces el mismo parámetro).
+### Paso 2 — Cargar catálogos y joins
+1. Cargar `ensayos`, `parametros`, `metodologias` desde sus CSV.
+2. Cargar `ensayo_parametros` y `ensayo_metodologias` desde los CSV, resolviendo los códigos a los `id` (INSERT ... SELECT id FROM ... WHERE codigo = ...).
+3. Verificación: el código **01 (Potabilidad)** debe quedar con **4 parámetros** (0001–0004) y **3 metodologías** (001, 045, 046).
 
-### Paso 3 — Frontend: conectar `web/src/pages/CargaResultados.tsx`
-1. Que la lista lateral traiga los **análisis pendientes reales** (del endpoint nuevo).
-2. Al seleccionar uno, cargar sus **parámetros reales** y permitir escribir el `valor` y la
-   `lectura_dilución` de cada uno.
-3. Al guardar, llamar al `POST` y que el análisis desaparezca de "pendientes".
-4. Resultado: **etapa 2 funciona de punta a punta** (pantalla → API → base).
+### Paso 3 — Backend: la plantilla del código
+- Endpoint **`GET /ensayos/:codigo/plantilla`**: devuelve, para ese código, la lista de **parámetros** (código, descripción, unidad, tipo_valor, orden) y la lista de **metodologías** (código, descripción).
 
-**Si no llegás a todo:** con el backend (pasos 1 y 2) andando ya es un gran avance.
+### Paso 4 — Frontend: "escribo el código → aparece todo"
+- Al **escribir/elegir el código de ensayo**, llamar a `/plantilla` y **renderizar solos**:
+  - un campo de resultado por cada parámetro (input **numérico** o selector **`-`/`+`** según `tipo_valor`),
+  - la lista de **metodologías** del código.
+- Permitir **borrar** un parámetro puntual. Nada más editable; las metodologías se mantienen.
 
-Al terminar la sesión, **actualizá `PARA_COWORK.md`** con lo que hiciste (la última vez quedó sin actualizar).
+**Si no llegás a todo:** con el esquema nuevo + los catálogos y joins cargados (pasos 1–2) ya es enorme.
+
+Al terminar la sesión, actualizá `PARA_COWORK.md` con lo que hiciste.

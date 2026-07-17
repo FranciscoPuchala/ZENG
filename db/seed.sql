@@ -2,9 +2,8 @@
 --  ZENG - Datos de prueba (seed)
 --  Correr con: psql -U postgres -d zeng -f db/seed.sql
 --
---  Solo carga datos CONFIRMADOS. Lo que depende de la 2a visita
---  (parámetros de otros ensayos, más clientes, usuarios reales)
---  se agrega después.
+--  Solo carga datos CONFIRMADOS. El catálogo real (151 ensayos,
+--  158 parámetros, 68 metodologías) se carga con los CSVs en el Paso 2.
 -- =====================================================================
 
 
@@ -28,13 +27,14 @@ INSERT INTO usuarios (iniciales, nombre) VALUES
 INSERT INTO ensayos (codigo, nombre) VALUES
   ('138', 'Enterobacterias');
 
--- PARÁMETRO del ensayo 138
--- (nombre exacto pendiente de la 2a visita — esto es un placeholder razonable)
-INSERT INTO parametros (ensayo_id, nombre, unidad, codigo, orden)
+-- PARÁMETRO standalone (nuevo esquema: parametros no tiene ensayo_id)
+INSERT INTO parametros (codigo, descripcion, unidad, tipo_valor) VALUES
+  ('0052', 'Enterobacterias', 'ufc/g', 'numerico');
+
+-- RELACIÓN: el ensayo 138 tiene el parámetro 0052, en orden 1
+INSERT INTO ensayo_parametros (ensayo_id, parametro_id, orden)
 VALUES (
-  (SELECT id FROM ensayos WHERE codigo = '138'),
-  'Enterobacterias',
-  'ufc/g',
-  '0052',
+  (SELECT id FROM ensayos   WHERE codigo = '138'),
+  (SELECT id FROM parametros WHERE codigo = '0052'),
   1
 );
