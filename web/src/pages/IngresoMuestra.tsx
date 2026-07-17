@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Plus, X, Search } from "lucide-react"
+import { X, Search, Check } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
 import { Toast } from "@/components/ui/toast"
@@ -55,9 +55,10 @@ export function IngresoMuestra() {
   const [recibidoPor,  setRecibidoPor]  = React.useState("")
   const [observaciones,setObservaciones]= React.useState("")
   const [ensayosSelec, setEnsayosSelec] = React.useState<number[]>([])
-  const [guardando,    setGuardando]    = React.useState(false)
-  const [busqueda,     setBusqueda]     = React.useState("")
-  const [toastVisible, setToastVisible] = React.useState(false)
+  const [guardando,       setGuardando]       = React.useState(false)
+  const [busqueda,        setBusqueda]        = React.useState("")
+  const [busquedaEnsayo,  setBusquedaEnsayo]  = React.useState("")
+  const [toastVisible,    setToastVisible]    = React.useState(false)
 
   // --- Cargar datos al abrir la pantalla ---
   React.useEffect(() => {
@@ -79,7 +80,6 @@ export function IngresoMuestra() {
       // Valores por defecto del form
       if (cli.length > 0) setClienteId(String(cli[0].id))
       if (usu.length > 0) setRecibidoPor(String(usu[0].id))
-      if (ens.length > 0) setEnsayosSelec([ens[0].id])
       setCargando(false)
     }
     cargar()
@@ -93,7 +93,7 @@ export function IngresoMuestra() {
 
   function limpiarForm() {
     setDescripcion(""); setFechaMuestreo(""); setObservaciones("")
-    if (ensayos.length > 0) setEnsayosSelec([ensayos[0].id])
+    setEnsayosSelec([]); setBusquedaEnsayo("")
   }
 
   async function guardarMuestra() {
@@ -221,23 +221,87 @@ export function IngresoMuestra() {
             <Label>
               Ensayos <span className="text-red-500" aria-hidden>*</span>
             </Label>
-            <div className="flex flex-wrap gap-1.5">
-              {ensayos.map(e => {
-                const sel = ensayosSelec.includes(e.id)
-                return (
-                  <button key={e.id} type="button" onClick={() => toggleEnsayo(e.id)}
-                    className={
-                      "flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors " +
-                      (sel
-                        ? "border-teal-700 bg-teal-50 text-teal-700"
-                        : "border-border bg-card text-muted-foreground hover:bg-muted")
-                    }>
-                    {e.codigo} · {e.nombre}
-                    {sel ? <X className="size-3" /> : <Plus className="size-3" />}
-                  </button>
-                )
-              })}
+
+            {/* Chips de seleccionados */}
+            {ensayosSelec.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {ensayosSelec.map(id => {
+                  const e = ensayos.find(e => e.id === id)
+                  if (!e) return null
+                  return (
+                    <span key={id} className="flex items-center gap-1 rounded-full border border-teal-300 bg-teal-50 px-2.5 py-0.5 text-xs font-medium text-teal-700">
+                      {e.codigo} · {e.nombre.length > 22 ? e.nombre.slice(0, 22) + "…" : e.nombre}
+                      <button
+                        type="button"
+                        onClick={() => toggleEnsayo(id)}
+                        aria-label={`Quitar ${e.nombre}`}
+                        className="ml-0.5 rounded-full p-0.5 hover:bg-teal-100"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Buscador */}
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por código o nombre…"
+                className="pl-8"
+                value={busquedaEnsayo}
+                onChange={e => setBusquedaEnsayo(e.target.value)}
+              />
             </div>
+
+            {/* Lista scrollable */}
+            {(() => {
+              const filtrados = ensayos.filter(e =>
+                busquedaEnsayo === "" ||
+                e.codigo.toLowerCase().includes(busquedaEnsayo.toLowerCase()) ||
+                e.nombre.toLowerCase().includes(busquedaEnsayo.toLowerCase())
+              )
+              return (
+                <div className="max-h-44 overflow-y-auto rounded-md border border-border">
+                  {filtrados.length === 0 ? (
+                    <p className="py-4 text-center text-xs text-muted-foreground">Sin resultados</p>
+                  ) : (
+                    <ul>
+                      {filtrados.map(e => {
+                        const sel = ensayosSelec.includes(e.id)
+                        return (
+                          <li key={e.id}>
+                            <button
+                              type="button"
+                              onClick={() => toggleEnsayo(e.id)}
+                              className={[
+                                "flex w-full items-center gap-2.5 border-b border-border px-3 py-2 text-left text-sm last:border-0 transition-colors",
+                                sel ? "bg-teal-50" : "hover:bg-muted/50",
+                              ].join(" ")}
+                            >
+                              <span className={[
+                                "flex size-4 shrink-0 items-center justify-center rounded border-2 transition-colors",
+                                sel ? "border-teal-600 bg-teal-600" : "border-border bg-card",
+                              ].join(" ")}>
+                                {sel && <Check className="size-2.5 text-white" strokeWidth={3} />}
+                              </span>
+                              <span className="w-9 shrink-0 font-mono text-[11px] text-muted-foreground">
+                                {e.codigo}
+                              </span>
+                              <span className={sel ? "text-teal-700 font-medium" : "text-foreground"}>
+                                {e.nombre}
+                              </span>
+                            </button>
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           <div className="flex flex-col gap-1.5">
