@@ -1,6 +1,11 @@
 import "dotenv/config"
 import express from "express"
 import pg from "pg"
+import bcrypt from "bcrypt"
+import jwt from "jsonwebtoken"
+
+const JWT_SECRET = process.env.JWT_SECRET
+const SALT_ROUNDS = 10
 
 // --- Conexión a PostgreSQL ---
 const pool = new pg.Pool({
@@ -15,13 +20,68 @@ const pool = new pg.Pool({
 const app = express()
 app.use(express.json())
 
-// CORS: permite que el frontend (localhost:5173) llame a esta API (localhost:3001)
+// CORS
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*")
-  res.header("Access-Control-Allow-Headers", "Content-Type")
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization")
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
   if (req.method === "OPTIONS") return res.sendStatus(200)
   next()
+})
+
+// Middleware: verifica el JWT y pone el usuario en req.usuario
+function auth(req, res, next) {
+  const header = req.headers.authorization
+  if (!header?.startsWith("Bearer ")) return res.status(401).json({ error: "No autenticado" })
+  try {
+    req.usuario = jwt.verify(header.slice(7), JWT_SECRET)
+    next()
+  } catch {
+    res.status(401).json({ error: "Token inválido o expirado" })
+  }
+}
+
+// ── LOGIN / SESIÓN ────────────────────────────────────────────────────
+
+// POST /login → verifica usuario+contraseña y devuelve un JWT
+app.post("/login", async (req, res) => {
+  const { usuario, password } = req.body
+  if (!usuario || !password) return res.status(400).json({ error: "Faltan datos" })
+
+  const result = await pool.query(
+    "SELECT id, usuario, nombre, iniciales, rol, password_hash FROM usuarios WHERE usuario = $1",
+    [usuario]
+  )
+  const user = result.rows[0]
+  if (!user) return res.status(401).json({ error: "Usuario o contraseña incorrectos" })
+
+  const ok = await bcrypt.compare(password, user.password_hash)
+  if (!ok) return res.status(401).json({ error: "Usuario o contraseña incorrectos" })
+
+  const token = jwt.sign(
+    { id: user.id, usuario: user.usuario, nombre: user.nombre, iniciales: user.iniciales, rol: user.rol },
+    JWT_SECRET,
+    { expiresIn: "12h" }
+  )
+  res.json({ token, usuario: { id: user.id, usuario: user.usuario, nombre: user.nombre, iniciales: user.iniciales, rol: user.rol } })
+})
+
+// GET /me → verifica el token y devuelve el usuario actual (para recargar la sesión)
+app.get("/me", auth, (req, res) => {
+  res.json(req.usuario)
+})
+
+// POST /usuarios → crea un usuario nuevo (solo admin)
+app.post("/usuarios", auth, async (req, res) => {
+  if (req.usuario.rol !== "admin") return res.status(403).json({ error: "Solo el admin puede crear usuarios" })
+  const { usuario, password, nombre, iniciales, rol = "analista" } = req.body
+  if (!usuario || !password || !iniciales) return res.status(400).json({ error: "Faltan datos obligatorios" })
+  const hash = await bcrypt.hash(password, SALT_ROUNDS)
+  const result = await pool.query(
+    "INSERT INTO usuarios (usuario, password_hash, nombre, iniciales, rol) VALUES ($1,$2,$3,$4,$5) RETURNING id, usuario, nombre, iniciales, rol",
+    [usuario, hash, nombre || null, iniciales, rol]
+  )
+  res.status(201).json(result.rows[0])
 })
 
 // ── CLIENTES ──────────────────────────────────────────────────────────

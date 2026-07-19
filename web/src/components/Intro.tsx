@@ -1,7 +1,5 @@
 import * as React from "react"
 
-const NOMBRE_USUARIO = "Francisco"
-
 export function Intro({ onDone }: { onDone: () => void }) {
   const [saliendo, setSaliendo] = React.useState(false)
 
@@ -41,7 +39,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
       />
 
       <div className="animate-intro-sub mt-6 text-5xl font-bold tracking-widest text-teal-300 uppercase text-center">
-        Bienvenido, {NOMBRE_USUARIO}
+        Bienvenido
       </div>
 
       <div className="animate-intro-sub2 mt-3 text-xl tracking-widest text-navy-100/50 uppercase text-center">

@@ -140,48 +140,48 @@ Dos herramientas que NO comparten memoria automáticamente. Este archivo `CLAUDE
   Además mantiene este `CLAUDE.md` al día.
 - **Regla:** toda decisión importante se escribe acá (o
 
-## Tarea actual (jul 2026) — Catálogos reales + "plantilla por código de ensayo", PASO A PASO
+## Despliegue en producción (4 PC, un servidor) — DECIDIDO
+Modelo **cliente-servidor** con **una sola base compartida**:
+- **Una máquina = servidor** (siempre prendida): corre **PostgreSQL + el backend Node**. Es la única que tiene la base.
+- **Las otras PC = clientes:** NO tienen base ni backend. Abren la **app web en el navegador** apuntando a la IP del servidor (ej. `http://192.168.1.50`). **Nada instalado por PC.**
+- **Actualizaciones:** se hacen **una sola vez en el servidor**; todas las PC ven la versión nueva al refrescar. (Por eso web y no escritorio.)
+- **Concurrencia:** PostgreSQL maneja varios usuarios a la vez; el cambio de uno lo ven las demás al refrescar/navegar (sync instantáneo = websockets, opcional a futuro).
+- **De dev a prod:** hoy todo corre en `localhost`. En prod: Postgres + backend en el servidor, y el frontend (`web`) apunta su URL de API a la IP del servidor (variable de entorno). Es cambio de config, no rehacer nada.
+- **Servidor:** una de las 4 PC (la más confiable, siempre prendida) o un equipo dedicado (mini-PC / Raspberry). A definir.
 
-> **IMPORTANTE para Claude Code:** Francisco está aprendiendo bases de datos e infraestructura.
-> Explicá cada paso simple, de a UNO, esperá que confirme, y enseñá el concepto detrás. Que
-> ENTIENDA, no solo que funcione.
+## Tarea actual (jul 2026) — Backups automáticos de la base al disco externo (2 TB), PASO A PASO
 
-**Contexto (relevado en la visita, 16 jul 2026):** el **código de ensayo es una PLANTILLA**. Al
-escribir el código, la app debe traer **solos** los **parámetros a rellenar** (los resultados) y
-las **metodologías** de ese código. **Nada es editable**, salvo **borrar** un parámetro que en un
-caso puntual no se hizo (las metodologías se mantienen). Los parámetros tienen dos **tipos de
-valor**: **numérico** o **presencia** (`-`/`+`, "incluye o no incluye").
+> **IMPORTANTE para Claude Code:** Francisco está aprendiendo. Explicá cada paso simple, de a
+> UNO, esperá que confirme, y enseñá el concepto (qué es pg_dump, una tarea programada, `.pgpass`, etc.).
 
-**Datos ya extraídos por Cowork (en `db/`, del Word + Excel del lab):**
-- `seed_metodologias.csv` — catálogo de 68 metodologías (código, descripción).
-- `seed_ensayo_parametros.csv` — qué parámetros tiene cada ensayo (376 pares): codigo_ensayo, codigo_parametro, orden.
-- `seed_ensayo_metodologias.csv` — qué metodologías tiene cada ensayo (283 pares).
-- Fuentes originales en `db/fuentes/`.
-- PENDIENTE (los genera Cowork): `seed_ensayos.csv` (código→nombre, 151) y `seed_parametros.csv` (código→descripción, unidad, tipo_valor, 158).
+**Contexto y decisiones (tomadas con Francisco):**
+- Respaldar la base `zeng` (los DATOS; el código ya está en GitHub).
+- **Cada 30 min** en horario de trabajo, al **disco externo de 2 TB** (carpeta dedicada; la letra del disco la define Francisco → hacerlo **configurable** arriba del script).
+- **Rotación generosa** (2 TB sobra): frecuentes cada 30 min retenidos ~7 días + **1 diario** retenido ~1 año.
+- **Sin copia off-site por ahora** (solo el disco externo).
+- El backup **no** necesita la app corriendo, solo PostgreSQL.
 
-**Modelo:** parámetros y metodologías son **dos listas separadas** por código (no van apareadas).
+### Paso 1 — Script de backup (PowerShell recomendado; nativo de Windows, no necesita Node)
+- Corre `pg_dump` de `zeng` en formato comprimido (`-F c`) → `<DISCO>:\backups_zeng\frecuentes\zeng_YYYY-MM-DD_HH-mm.dump`.
+  - La letra del disco = variable configurable arriba del script.
+  - Contraseña: usar `.pgpass` o la variable `PGPASSWORD` (NO hardcodear en el repo).
+  - Requiere el PATH de Postgres (`C:\Program Files\PostgreSQL\18\bin`).
+- Borra de `frecuentes/` los backups con más de **7 días**.
+- Escribe una línea en un **log** (`backups_zeng\backup.log`): fecha + OK/ERROR.
 
-### Paso 1 — Ajustar el esquema (nueva migración en db/)
-- Nueva tabla **`metodologias`** (id, codigo TEXT UNIQUE, descripcion TEXT).
-- **`parametros`**: quitar `ensayo_id`; queda catálogo standalone (id, codigo TEXT UNIQUE, descripcion TEXT, unidad TEXT, **tipo_valor** TEXT CHECK IN ('numerico','presencia') DEFAULT 'numerico').
-- Nueva **`ensayo_parametros`** (id, ensayo_id FK, parametro_id FK, orden INT, UNIQUE(ensayo_id, parametro_id)).
-- Nueva **`ensayo_metodologias`** (id, ensayo_id FK, metodologia_id FK, orden INT, UNIQUE(ensayo_id, metodologia_id)).
-- Actualizar el `seed.sql` viejo (ataba el parámetro 0052 por `ensayo_id` — ahora va por el join).
+### Paso 2 — Backup diario
+- Una vez al día (ej. 23:00): un dump a `<DISCO>:\backups_zeng\diarios\zeng_YYYY-MM-DD.dump`, y borra los `diarios/` de más de **365 días**.
 
-### Paso 2 — Cargar catálogos y joins
-1. Cargar `ensayos`, `parametros`, `metodologias` desde sus CSV.
-2. Cargar `ensayo_parametros` y `ensayo_metodologias` desde los CSV, resolviendo los códigos a los `id` (INSERT ... SELECT id FROM ... WHERE codigo = ...).
-3. Verificación: el código **01 (Potabilidad)** debe quedar con **4 parámetros** (0001–0004) y **3 metodologías** (001, 045, 046).
+### Paso 3 — Programar con el Programador de tareas de Windows
+- Una tarea que corra el script **cada 30 min** en horario de trabajo (ej. 08–20 h), y otra **diaria**.
+- Que se ejecuten **aunque nadie esté logueado** y que **sobrevivan a reinicios**.
 
-### Paso 3 — Backend: la plantilla del código
-- Endpoint **`GET /ensayos/:codigo/plantilla`**: devuelve, para ese código, la lista de **parámetros** (código, descripción, unidad, tipo_valor, orden) y la lista de **metodologías** (código, descripción).
+### Paso 4 — Probar la restauración (clave)
+- Restaurar un backup en una base temporal (`pg_restore` → `zeng_test`) para confirmar que **sirve de verdad**. Documentar el comando de restore.
 
-### Paso 4 — Frontend: "escribo el código → aparece todo"
-- Al **escribir/elegir el código de ensayo**, llamar a `/plantilla` y **renderizar solos**:
-  - un campo de resultado por cada parámetro (input **numérico** o selector **`-`/`+`** según `tipo_valor`),
-  - la lista de **metodologías** del código.
-- Permitir **borrar** un parámetro puntual. Nada más editable; las metodologías se mantienen.
+### Paso 5 — Guardar en el repo
+- Script(s) en `scripts/`, con un README corto: cómo configurar (letra del disco, horario) y cómo restaurar.
 
-**Si no llegás a todo:** con el esquema nuevo + los catálogos y joins cargados (pasos 1–2) ya es enorme.
+**Verificación:** que quede fácil ver "último backup OK" (el log, o mostrarlo en algún lado a futuro). Un backup que nadie chequea puede fallar en silencio.
 
-Al terminar la sesión, actualizá `PARA_COWORK.md` con lo que hiciste.
+Al terminar la sesión, actualizá `PARA_COWORK.md`.

@@ -601,3 +601,133 @@ Los clientes actuales en la base son de prueba. Hay que cargar los clientes real
 6. **Pantalla Ensayos** — gestión del catálogo (alta/baja desde la app, si hace falta).
 
 *Actualizado por Claude Code el 19/07/2026.*
+
+---
+
+## Sesión — 19 jul 2026 (tarde) — SISTEMA DE LOGIN COMPLETO
+
+### Resumen ejecutivo
+
+Se implementó el sistema de autenticación completo. Flujo: **Login → Intro → App**. Los usuarios se identifican antes de entrar, el nombre real aparece en el sidebar, y hay un botón de cerrar sesión.
+
+---
+
+### Base de datos — migración login ✅
+
+Nuevo archivo: `db/migracion_login.sql`
+
+Cambios aplicados sobre la base real:
+```sql
+ALTER TABLE usuarios
+  ADD COLUMN usuario       TEXT UNIQUE,
+  ADD COLUMN password_hash TEXT,
+  ADD COLUMN rol           TEXT NOT NULL DEFAULT 'analista'
+                           CHECK (rol IN ('admin', 'analista', 'tecnico'));
+```
+
+**Nota:** el constraint se amplió en la misma sesión para incluir `'tecnico'` como tercer rol válido (además de `'admin'` y `'analista'`).
+
+Los usuarios de prueba (sv, dq, fr, dg) fueron **borrados** de la base. Solo quedan usuarios reales del laboratorio.
+
+---
+
+### Backend — 3 endpoints nuevos + middleware ✅
+
+Paquetes instalados: `bcrypt` + `jsonwebtoken`
+
+Nueva variable de entorno en `api/.env`: `JWT_SECRET` (clave aleatoria generada automáticamente).
+
+**Middleware `auth(req, res, next)`:** verifica el token JWT en el header `Authorization: Bearer <token>`. Se usa en endpoints protegidos.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| POST | `/login` | Verifica usuario + bcrypt hash, devuelve JWT de 12h |
+| GET | `/me` | Verifica token y devuelve datos del usuario actual |
+| POST | `/usuarios` | Crea usuario nuevo (solo rol `admin`) |
+
+**JWT payload:** `{ id, usuario, nombre, iniciales, rol, exp }` — el frontend lo decodifica sin verificar firma (solo para mostrar datos), la verificación real la hace el backend.
+
+---
+
+### Script para crear usuarios desde terminal ✅
+
+Archivo: `api/crear_admin.js`
+
+```bash
+cd api
+node crear_admin.js
+```
+
+Hace 4 preguntas interactivas (usuario, contraseña, nombre, iniciales) y crea el usuario como `admin`. Si el usuario ya existe, actualiza su contraseña. Válido para crear cualquier usuario, no solo admins.
+
+**Forma de correrlo:** siempre desde dentro de la carpeta `api/` (no desde la raíz).
+
+---
+
+### Frontend — 4 archivos modificados/creados ✅
+
+**`web/src/lib/auth.ts`** (nuevo):
+- `guardarToken(token)` / `leerToken()` / `borrarToken()` — maneja el JWT en `localStorage`
+- `leerSesion()` — decodifica el payload del JWT guardado y verifica que no esté expirado
+
+**`web/src/pages/Login.tsx`** (nuevo):
+- Pantalla de login con fondo navy, logo Z, campos usuario + contraseña
+- Llama a `POST /login`, guarda el token, llama a `onLogin(usuario)`
+- Muestra error si usuario/contraseña incorrectos o servidor caído
+- Botón deshabilitado hasta que ambos campos estén completos
+
+**`web/src/App.tsx`** (modificado):
+- Nuevo estado `usuario: UsuarioSesion | null` — inicializado desde `leerSesion()` (persiste entre recargas)
+- Flujo: sin sesión → `<Login>`, con sesión → Intro → App
+- `handleLogin()`: guarda usuario, resetea intro para que se muestre al entrar
+- `handleLogout()`: borra token, limpia estado, vuelve al login
+
+**`web/src/components/layout/AppShell.tsx`** (modificado):
+- Acepta props `usuario: UsuarioSesion` y `onLogout: () => void`
+- Footer del sidebar: muestra iniciales reales (con fondo teal), nombre completo y rol
+- Botón de cerrar sesión (ícono `LogOut`) al lado del nombre — rojo al hover
+- Ya no hay datos hardcodeados ("Francisco · Recepción")
+
+**`web/src/components/Intro.tsx`** (modificado):
+- Eliminada la constante `NOMBRE_USUARIO = "Francisco"`
+- Texto cambiado de `"Bienvenido, {NOMBRE_USUARIO}"` → `"Bienvenido"` (sin nombre)
+
+---
+
+### Roles en uso
+
+| Rol | Descripción |
+|---|---|
+| `admin` | Puede crear usuarios, acceso total |
+| `analista` | Acceso normal al flujo del lab |
+| `tecnico` | Tercer rol agregado en esta sesión a pedido del lab |
+
+La diferenciación de permisos por rol en el frontend (qué puede ver/hacer cada uno) queda para una fase futura.
+
+---
+
+### Pendiente — Gestión de usuarios desde la app
+
+Hoy la única forma de crear/modificar usuarios es:
+- **Crear:** `node crear_admin.js` desde la terminal (carpeta `api/`)
+- **Ver/modificar:** psql → `SELECT id, iniciales, nombre, usuario, rol FROM usuarios;` + `UPDATE`
+
+Se decidió no construir la pantalla de Configuración → Usuarios en esta sesión. Queda pendiente para cuando haga falta.
+
+---
+
+### Estado actual del proyecto (19 jul 2026, noche)
+
+| Componente | Estado |
+|---|---|
+| Sistema de login (DB + backend + frontend) | ✅ Completo |
+| Etapa 1 — Ingreso de Muestra | ✅ Funciona de punta a punta |
+| Etapa 2 — Carga de Resultados | ✅ Funciona de punta a punta |
+| Etapa 3 — Cuaderno de Análisis | ✅ Funciona de punta a punta |
+| Informe de Ensayo (impresión) | ✅ Renderizado HTML, imprime desde el navegador |
+| Panel con datos reales | ✅ Stats, gráficos, reloj, últimos informes |
+| Pantalla Clientes | ✅ Lista + historial + reimpresión |
+| Gestión de usuarios desde la app | ⏳ Pendiente (hoy solo desde terminal/psql) |
+| Confirmaciones del lab (formatos de informe, parámetros, etc.) | ⏳ Esperando — ver sección anterior |
+
+*Actualizado por Claude Code el 19/07/2026.*
