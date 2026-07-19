@@ -86,8 +86,9 @@ export function CargaResultados() {
   const [horaSiembra,  setHoraSiembra]  = React.useState(horaAhoraISO())
   const [analistaId,   setAnalistaId]   = React.useState("")
   const [revisorId,    setRevisorId]    = React.useState("")
-  const [valores, setValores] = React.useState<Record<number, string>>({})
-  const [guardando, setGuardando] = React.useState(false)
+  const [valores,       setValores]       = React.useState<Record<number, string>>({})
+  const [guardando,     setGuardando]     = React.useState(false)
+  const [errorValores,  setErrorValores]  = React.useState<number[]>([])
 
   // Sección Reporte de Ficha
   const [fichaAbierta,    setFichaAbierta]    = React.useState(false)
@@ -182,6 +183,12 @@ export function CargaResultados() {
 
   async function guardar() {
     if (!seleccionado) return
+    const vacios = parametros.filter(p => !(valores[p.id] ?? "").trim())
+    if (vacios.length > 0) {
+      setErrorValores(vacios.map(p => p.id))
+      return
+    }
+    setErrorValores([])
     setGuardando(true)
     try {
       const res = await fetch(`${API}/analisis/${seleccionado.id}/resultados`, {
@@ -507,12 +514,20 @@ export function CargaResultados() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {parametros.map(p => (
-                          <TableRow key={p.id}>
+                        {parametros.map(p => {
+                          const conError = errorValores.includes(p.id)
+                          return (
+                          <TableRow
+                            key={p.id}
+                            className={conError ? "bg-red-50" : ""}
+                          >
                             <TableCell>
                               <div className="text-sm">{p.descripcion}</div>
                               {p.unidad && (
                                 <div className="text-xs text-muted-foreground">{p.unidad}</div>
+                              )}
+                              {conError && (
+                                <div className="text-[11px] text-red-500">Completá este campo o eliminalo</div>
                               )}
                             </TableCell>
                             <TableCell className="font-mono text-xs text-muted-foreground">
@@ -522,14 +537,20 @@ export function CargaResultados() {
                               {p.tipo_valor === "presencia" ? (
                                 <SelectorPresencia
                                   value={valores[p.id] ?? ""}
-                                  onChange={v => setValores(prev => ({ ...prev, [p.id]: v }))}
+                                  onChange={v => {
+                                    setValores(prev => ({ ...prev, [p.id]: v }))
+                                    setErrorValores(prev => prev.filter(id => id !== p.id))
+                                  }}
                                 />
                               ) : (
                                 <Input
                                   placeholder="Ej. <1.0*10(1)"
-                                  className="h-8 font-mono text-xs"
+                                  className={["h-8 font-mono text-xs", conError ? "border-red-400 ring-1 ring-red-400" : ""].join(" ")}
                                   value={valores[p.id] ?? ""}
-                                  onChange={e => setValores(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                  onChange={e => {
+                                    setValores(prev => ({ ...prev, [p.id]: e.target.value }))
+                                    if (e.target.value.trim()) setErrorValores(prev => prev.filter(id => id !== p.id))
+                                  }}
                                 />
                               )}
                             </TableCell>
@@ -537,14 +558,18 @@ export function CargaResultados() {
                               <button
                                 type="button"
                                 title="Quitar parámetro de este análisis"
-                                onClick={() => eliminarParametro(p.id)}
+                                onClick={() => {
+                                  eliminarParametro(p.id)
+                                  setErrorValores(prev => prev.filter(id => id !== p.id))
+                                }}
                                 className="flex size-7 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-red-50 hover:text-red-500"
                               >
                                 <X className="size-3.5" />
                               </button>
                             </TableCell>
                           </TableRow>
-                        ))}
+                          )
+                        })}
                       </TableBody>
                     </Table>
                   </div>

@@ -393,3 +393,211 @@ El script usa `ON CONFLICT DO UPDATE` en todos los inserts, por lo que se puede 
 3. **PDF Informe de Ensayo** — después de cerrar el formato exacto con el laboratorio
 
 *Actualizado por Claude Code el 17/07/2026.*
+
+---
+
+## Sesión — 18-19 jul 2026 — INFORME REAL + PANEL + CLIENTES + VARIAS MEJORAS
+
+### Resumen ejecutivo
+
+Sesión muy intensa. Se construyó el **Informe de Ensayo real** (renderizado HTML con todos los campos del informe actual del lab), se completó el **Panel** con datos reales y gráficos, se hizo la **pantalla de Clientes** con historial de análisis, y se mejoraron varias pantallas con validaciones, búsqueda y correcciones de UX.
+
+---
+
+### Informe de Ensayo real — `web/src/pages/InformeImpresion.tsx` (NUEVO ARCHIVO) ✅
+
+Se reemplazó el placeholder del Cuaderno de Análisis por un informe real que se **imprime desde el navegador** (`window.print()`). El informe se renderiza en un **portal React** (`createPortal`) adjunto al `<body>`, con CSS `@media print` que oculta toda la UI y muestra solo el contenido del informe.
+
+**Estructura del informe (reproduciendo el original del lab):**
+- Cabecera: logo ZENG + bloque "ORGANISMO URUGUAYO DE ACREDITACIÓN / LE 006"
+- Título: "Informe de Ensayo de {nombre del ensayo}"
+- Tabla cliente / N° informe (dos columnas): cliente, dirección, teléfono, fax / N° informe, fechas (muestreo, recepción, análisis, emisión)
+- Bloques por análisis: N° análisis + descripción de muestra, filas de resultados (descripción, valor)
+- Observaciones y firma ("por ZENG Laboratorio Microbiológico")
+- **Método analítico** → listado de metodologías del ensayo (va DEBAJO de la firma)
+- Notas (3 puntos fijos)
+- Pie del timbre profesional
+- Pie de página: nota sobre `(-)` / OUA LE 006, URLs, dirección
+
+**N° de ANÁLISIS** (formato confirmado): `{numero_cliente}/{nro_secuencial_por_cliente}/{AA-MM-DD de siembra}`
+- El número secuencial es **por cliente**, no global: se calcula con `ROW_NUMBER() OVER (PARTITION BY cliente_id ORDER BY numero_interno)` en SQL.
+
+**N° de INFORME** (auto-generado): `{numero_cliente}/{codigo_ensayo}/{AA-MM-DD de emisión}`
+- Se genera automáticamente al seleccionar análisis en el Cuaderno; no requiere entrada manual.
+
+**Endpoint de datos:** `GET /informes/:id/reporte` → devuelve `{ informe, ensayo, analisis[], metodologias[] }`
+
+**Impresión:**
+- `window.print()` es síncrono en Chrome → al volver del diálogo, el overlay se cierra solo.
+- CSS `@media print`: oculta toda la UI (`body > *:not(#informe-print-root)`), muestra solo el portal; reset de `position`/`overflow`/`height` para el portal y su div interno.
+
+---
+
+### Auto-cierre del overlay de impresión ✅
+
+**Problema resuelto:** el overlay (InformeImpresion) permanecía visible después de que el usuario cerraba el diálogo de impresión de Chrome.
+
+**Solución final:** llamar `onCerrar(modoConfirmacion)` inmediatamente después de `window.print()` (síncrono):
+```js
+onClick={() => {
+  window.print()
+  onCerrar(modoConfirmacion)
+}}
+```
+Se descartó el enfoque con `afterprint` (event listener) porque no es confiable en todas las versiones de Chrome.
+
+---
+
+### Flujo de confirmación de impresión ✅
+
+**Problema:** si el usuario publicaba un informe pero cerraba el overlay sin imprimir, los análisis desaparecían del Cuaderno y no podía recuperarlos.
+
+**Solución:** estado `idsRecienPublicados` en CuadernoAnalisis:
+- Al publicar: los IDs se guardan en `idsRecienPublicados` (NO se eliminan de `cargados` todavía).
+- El InformeImpresion recibe `modoConfirmacion={true}` (primera apertura) o `{false}` (reimpresión desde Clientes).
+- `onCerrar(true)` → elimina los análisis del Cuaderno (confirma que se imprimió).
+- `onCerrar(false)` → cierra sin eliminar (usuario canceló o volvió del overlay sin imprimir).
+
+---
+
+### Informes publicados en CuadernoAnalisis ✅
+
+Se reemplazó el placeholder del informe por una tabla real de **Informes publicados** al pie de la pantalla Cuaderno de Análisis:
+- Trae datos de `GET /informes` (LIMIT 100, ORDER BY id DESC).
+- Columnas: N° informe, cliente, ensayo, fecha emisión, cantidad de análisis, botón Reimprimir.
+- Botón "Reimprimir" abre InformeImpresion con `modoConfirmacion={false}`.
+- Nuevo endpoint en API: `GET /informes` → lista completa de informes publicados con join a clientes y conteo de análisis.
+
+---
+
+### Panel rediseñado con datos reales ✅
+
+`web/src/pages/Panel.tsx` reescrito completo.
+
+**Datos: nuevo endpoint `GET /stats/panel`** — una sola llamada con `Promise.all` que devuelve:
+- `pendientes`: análisis en estado `pendiente`
+- `cargados`: análisis en estado `cargado` (renombrado de "en carga de resultados" → "Listos para informe")
+- `informes_total`: total de informes publicados
+- `muestras_hoy`: muestras con `DATE(fecha_entrada) = CURRENT_DATE` (reemplazó "clientes registrados")
+- `top_ensayos`: top 5 ensayos por cantidad de análisis
+- `actividad_14d`: muestras recibidas por día en los últimos 14 días
+- `ultimos_informes`: últimos 5 informes (N° informe, cliente, fecha, cantidad análisis)
+
+**Componentes visuales nuevos:**
+- Reloj en tiempo real (setInterval, esquina superior derecha)
+- 4 stat tiles con colores semánticos (amber, blue, teal, slate)
+- `BarraEnsayo`: barras horizontales proporcionales para top ensayos
+- `ActivityChart`: SVG de barras verticales para actividad de 14 días, con tooltip hover y barra de hoy en teal sólido
+- Lista de últimos 5 informes con N° informe, cliente, fecha, badge "X análisis"
+- `rellenarDias()`: helper que rellena días sin datos con 0 para mantener 14 barras siempre visibles
+
+---
+
+### Pantalla Clientes ✅
+
+`web/src/pages/Clientes.tsx` (archivo nuevo).
+
+**Layout dos paneles:**
+- Izquierda (300px fija): lista de todos los clientes con búsqueda por nombre. Viene de `GET /clientes`.
+- Derecha: historial completo de análisis del cliente seleccionado. Viene de `GET /clientes/:id/analisis`.
+
+**Búsqueda de análisis:** filtra en tiempo real por N° análisis, N° muestra, ensayo, descripción, N° informe, cualquier fecha.
+
+**Tabla de análisis:** N° Análisis (calculado con `nroAnalisis()`), N° Muestra, Descripción, Ensayo (badge), F. Recepción, F. Siembra, N° Informe, Estado (badge), botón Imprimir (si tiene informe).
+
+**Nuevo endpoint:** `GET /clientes/:id/analisis` → historial completo con `ROW_NUMBER() OVER (PARTITION BY cliente_id ORDER BY numero_interno)` para calcular el número secuencial por cliente.
+
+---
+
+### Búsqueda de clientes en Ingreso de Muestra ✅
+
+Se reemplazó el `<Select>` de clientes por un buscador igual al de ensayos:
+- Sin cliente seleccionado: campo de texto + lista scrollable filtrada.
+- Con cliente seleccionado: chip con `numero_cliente — nombre` y botón `×` para deseleccionar.
+- El formulario ya no pre-selecciona el primer cliente al cargar (requiere selección explícita).
+
+---
+
+### Validación en Carga de Resultados ✅
+
+Si el usuario intenta guardar con campos de parámetros vacíos, la app bloquea el guardado y resalta visualmente las filas problemáticas (fondo rojo claro, borde rojo en el input, mensaje de error). El error se limpia campo por campo al completarlo o al eliminar el parámetro.
+
+---
+
+### Auto-fill fecha de recepción ✅
+
+Al seleccionar análisis en el Cuaderno, `fecha_recepcion` se rellena automáticamente con la `fecha_entrada` de la muestra (viene en la respuesta de `GET /analisis/cargados`).
+
+---
+
+### Datos de prueba borrados ✅
+
+Se eliminaron todas las filas de prueba de `muestras`, `analisis`, `informes` y `resultados` para empezar con datos reales del lab.
+
+---
+
+### Estado actual del proyecto (19 jul 2026)
+
+| Componente | Estado |
+|---|---|
+| Etapa 1 — Ingreso de Muestra | ✅ Funciona de punta a punta |
+| Etapa 2 — Carga de Resultados | ✅ Funciona de punta a punta |
+| Etapa 3 — Cuaderno de Análisis | ✅ Funciona de punta a punta |
+| Informe de Ensayo (impresión) | ✅ Renderizado HTML, imprime desde el navegador |
+| Panel con datos reales | ✅ Stats, gráficos, reloj, últimos informes |
+| Pantalla Clientes | ✅ Lista + historial de análisis + reimpresión |
+| Catálogo real (151 ensayos, 149 parámetros, 68 metodologías) | ✅ Cargado en la base |
+| Catálogo de clientes reales | ⏳ Pendiente — usar datos del lab |
+| Múltiples formatos de informe por código | ⏳ Pendiente — ver abajo |
+
+---
+
+### PENDIENTES — confirmaciones del laboratorio (crítico)
+
+Estos puntos están **bloqueados esperando información del lab** (Francisco va a consultar):
+
+#### 1. Parámetros con valores predeterminados
+
+Muchos resultados tienen **valores típicos fijos** que aparecen por defecto pero pueden modificarse en casos especiales. Falta saber:
+- ¿Qué parámetros tienen valor predeterminado?
+- ¿Cuál es el valor por defecto de cada uno?
+- Afecta directamente a `CargaResultados.tsx`: los inputs deben venir pre-cargados con ese valor.
+
+#### 2. Cuáles parámetros son tipo `presencia` (`-` / `+`)
+
+El campo `tipo_valor` del CSV dice qué parámetros son `presencia` (ej. Salmonella, Listeria), pero hay que **confirmar con el lab** si la lista del CSV es correcta y completa. En el informe impreso, los valores `presencia` no aparecen como `-`/`+` sino como texto (ej. "Ausencia en 25g" / "Presencia en 25g") — también falta confirmar el texto exacto de cada valor.
+
+#### 3. PDF con header/footer de los informes
+
+El lab va a mandar un PDF mostrando exactamente cómo es el encabezado y pie de página que aparece en **todas las hojas** de los informes. Esto es importante porque:
+- El informe actual puede ocupar varias páginas (múltiples análisis, muchos parámetros).
+- Cada página repite el header/footer.
+- Hay que reproducirlo exactamente en el CSS de impresión (`@page`, `thead` repetible, etc.).
+
+#### 4. Parámetros con `(-)` → apariencia en el informe
+
+El prefijo `(-)` en un nombre de parámetro indica que ese ensayo **no está dentro del alcance de acreditación OUA LE 006**. En el informe impreso, ¿cómo aparecen exactamente estos parámetros? ¿Con el `(-)` en el nombre, o de otra forma?
+
+#### 5. Formatos diferentes de informe por código de ensayo
+
+Se confirmó que **al menos los códigos 01 y 121 tienen un formato de informe diferente** al resto. Y posiblemente hay otros códigos con formatos distintos también. Falta saber:
+- ¿Cuáles códigos tienen formato diferente?
+- ¿En qué difieren (distinto orden de campos, campos extra, distinto título, etc.)?
+- Esto va a requerir un componente de informe diferente por tipo, o plantillas configurables.
+
+#### 6. Catálogo de clientes reales
+
+Los clientes actuales en la base son de prueba. Hay que cargar los clientes reales del lab (con su `numero_cliente`, nombre, dirección, teléfono, etc.). Viene del sistema actual (Access/SQL Server).
+
+---
+
+### Próximos pasos (en orden de prioridad)
+
+1. **Recibir confirmaciones del lab** (puntos 1–5 de arriba) → sin esto no se puede finalizar el informe.
+2. **Cargar clientes reales** desde el sistema actual (Access/SQL Server) — Paso 2 del roadmap.
+3. **Ajustar el informe** según el PDF de header/footer que mande el lab.
+4. **Valores predeterminados en CargaResultados** → pre-cargar inputs con el valor típico.
+5. **Múltiples formatos de informe** → implementar variante para 01, 121, y los que falten.
+6. **Pantalla Ensayos** — gestión del catálogo (alta/baja desde la app, si hace falta).
+
+*Actualizado por Claude Code el 19/07/2026.*

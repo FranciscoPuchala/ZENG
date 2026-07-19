@@ -125,7 +125,7 @@ function InformeLayout({
             size="sm"
             onClick={() => {
               window.print()
-              if (modoConfirmacion) onCerrar(true)
+              onCerrar(modoConfirmacion)
             }}
           >
             <Printer /> Imprimir / PDF
