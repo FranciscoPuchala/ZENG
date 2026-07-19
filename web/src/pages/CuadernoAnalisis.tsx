@@ -2,6 +2,7 @@ import * as React from "react"
 import { FileCheck2, CheckCircle2, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Toast } from "@/components/ui/toast"
+import { InformeImpresion } from "@/pages/InformeImpresion"
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter,
 } from "@/components/ui/card"
@@ -26,6 +27,17 @@ interface Analisis {
   fecha_siembra: string | null
 }
 
+interface InformePublicado {
+  id: number
+  numero_informe: string
+  fecha_emision: string | null
+  cliente_nombre: string
+  numero_cliente: string
+  ensayo_codigo: string | null
+  ensayo_nombre: string | null
+  cantidad_analisis: number
+}
+
 const API = "http://localhost:3001"
 
 function formatFecha(iso: string | null) {
@@ -35,23 +47,45 @@ function formatFecha(iso: string | null) {
 }
 
 export function CuadernoAnalisis() {
-  const [cargados, setCargados]           = React.useState<Analisis[]>([])
-  const [cargando, setCargando]           = React.useState(true)
-  const [seleccionados, setSeleccionados] = React.useState<number[]>([])
-  const [publicando, setPublicando]       = React.useState(false)
-  const [toastVisible, setToastVisible]   = React.useState(false)
-  const [toastMsg, setToastMsg]           = React.useState("")
+  const [cargados, setCargados]                   = React.useState<Analisis[]>([])
+  const [cargando, setCargando]                   = React.useState(true)
+  const [seleccionados, setSeleccionados]         = React.useState<number[]>([])
+  const [publicando, setPublicando]               = React.useState(false)
+  const [informeId, setInformeId]                 = React.useState<number | null>(null)
+  const [toastVisible, setToastVisible]           = React.useState(false)
+  const [toastMsg, setToastMsg]                   = React.useState("")
+  const [informesPublicados, setInformesPublicados] = React.useState<InformePublicado[]>([])
+  const [idsRecienPublicados, setIdsRecienPublicados] = React.useState<number[]>([])
 
-  // Formulario
+  // Formulario — fechaEmision arranca con hoy para que el N° se genere al toque
   const [numeroInforme,  setNumeroInforme]  = React.useState("")
   const [fechaRecepcion, setFechaRecepcion] = React.useState("")
-  const [fechaEmision,   setFechaEmision]   = React.useState("")
+  const [fechaEmision,   setFechaEmision]   = React.useState(
+    () => new Date().toISOString().split("T")[0]
+  )
+
+  function cargarInformes() {
+    fetch(`${API}/informes`)
+      .then(r => r.json())
+      .then(setInformesPublicados)
+  }
 
   React.useEffect(() => {
     fetch(`${API}/analisis/cargados`)
       .then(r => r.json())
       .then(data => { setCargados(data); setCargando(false) })
+    cargarInformes()
   }, [])
+
+  // Auto-genera N° de INFORME y pre-rellena fecha de recepción desde la muestra
+  React.useEffect(() => {
+    if (seleccionados.length === 0 || !fechaEmision) { setNumeroInforme(""); return }
+    const primero = cargados.find(a => a.id === seleccionados[0])
+    if (!primero) return
+    const [yyyy, mm, dd] = fechaEmision.split("-")
+    setNumeroInforme(`${primero.numero_cliente}/${primero.ensayo_codigo}/${yyyy.slice(2)}-${mm}-${dd}`)
+    setFechaRecepcion(primero.fecha_entrada.split("T")[0])
+  }, [seleccionados, fechaEmision, cargados])
 
   // Cliente "bloqueado" — el del primer seleccionado
   const clienteId = seleccionados.length > 0
@@ -91,13 +125,14 @@ export function CuadernoAnalisis() {
         }),
       })
       if (res.ok) {
-        setCargados(prev => prev.filter(a => !seleccionados.includes(a.id)))
+        const creado = await res.json()
+        setIdsRecienPublicados(seleccionados)
         setSeleccionados([])
         setNumeroInforme("")
         setFechaRecepcion("")
-        setFechaEmision("")
-        setToastMsg(`Informe ${numeroInforme} publicado correctamente.`)
-        setToastVisible(true)
+        setFechaEmision(new Date().toISOString().split("T")[0])
+        cargarInformes()
+        setInformeId(creado.id)
       }
     } finally {
       setPublicando(false)
@@ -219,12 +254,12 @@ export function CuadernoAnalisis() {
               </Label>
               <Input
                 id="num-informe"
-                placeholder="Ej. 2026-0042"
+                placeholder="Se genera al elegir fecha de emisión"
                 value={numeroInforme}
                 onChange={e => setNumeroInforme(e.target.value)}
               />
               <p className="text-[11px] text-muted-foreground">
-                Regla exacta a confirmar en la 2ª visita.
+                Auto-generado como cliente/ensayo/AA-MM-DD. Podés agregar el número de secuencia al final si es necesario (ej. -2).
               </p>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -267,23 +302,68 @@ export function CuadernoAnalisis() {
         </Card>
       )}
 
-      {/* Placeholder PDF */}
-      <Card className="border-dashed">
+      {/* Informes publicados — para reimprimir en cualquier momento */}
+      <Card>
         <CardHeader>
-          <CardTitle className="text-muted-foreground/50">
-            Vista previa — Informe de Ensayo
-          </CardTitle>
-          <CardDescription>
-            El formato exacto se define después de la 2ª visita al laboratorio
-            (ver docs/ZENG - Checklist 2a visita.pdf). Acá irá la reproducción
-            fiel del documento que hoy genera el sistema Access.
-          </CardDescription>
+          <CardTitle>Informes publicados</CardTitle>
+          <CardDescription>Hacé click en "Imprimir" para volver a ver cualquier informe.</CardDescription>
         </CardHeader>
-        <CardContent className="flex h-28 items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-muted-foreground/40">
-            <FileCheck2 className="size-7" />
-            <p className="text-xs">Formato pendiente — 2ª visita al lab</p>
-          </div>
+        <CardContent className="p-0">
+          {informesPublicados.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
+              <FileCheck2 className="size-7 opacity-25" />
+              <p className="text-sm">Todavía no hay informes publicados.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>N° de informe</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Ensayo</TableHead>
+                  <TableHead>F. emisión</TableHead>
+                  <TableHead className="w-10 text-center">Muestras</TableHead>
+                  <TableHead className="w-24"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {informesPublicados.map(inf => (
+                  <TableRow key={inf.id}>
+                    <TableCell className="font-mono text-xs font-semibold">
+                      {inf.numero_informe}
+                    </TableCell>
+                    <TableCell>
+                      <div className="text-sm font-medium">{inf.cliente_nombre}</div>
+                      <div className="text-xs text-muted-foreground">{inf.numero_cliente}</div>
+                    </TableCell>
+                    <TableCell>
+                      {inf.ensayo_codigo ? (
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium">
+                          {inf.ensayo_codigo}
+                        </span>
+                      ) : "—"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatFecha(inf.fecha_emision)}
+                    </TableCell>
+                    <TableCell className="text-center text-sm text-muted-foreground">
+                      {inf.cantidad_analisis}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setInformeId(inf.id)}
+                      >
+                        <Printer className="mr-1 size-3.5" />
+                        Imprimir
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -292,6 +372,23 @@ export function CuadernoAnalisis() {
         visible={toastVisible}
         onClose={() => setToastVisible(false)}
       />
+
+      {/* Vista de impresión — aparece tras publicar */}
+      {informeId !== null && (
+        <InformeImpresion
+          informeId={informeId}
+          modoConfirmacion={idsRecienPublicados.length > 0}
+          onCerrar={(confirmado) => {
+            setInformeId(null)
+            if (confirmado && idsRecienPublicados.length > 0) {
+              setCargados(prev => prev.filter(a => !idsRecienPublicados.includes(a.id)))
+              setIdsRecienPublicados([])
+              setToastMsg("Informe confirmado. Los análisis fueron archivados.")
+              setToastVisible(true)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

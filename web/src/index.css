@@ -146,3 +146,37 @@
   /* Transición de página y animaciones de interacción →
      manejadas por <MotionConfig reducedMotion="user"> en App.tsx */
 }
+
+/* ── Impresión de Informes de Ensayo ──────────────────────────────── */
+@media print {
+  /* Ocultar todo excepto el documento activo */
+  body > *:not(#informe-print-root):not(#reporte-ficha-root) {
+    display: none !important;
+  }
+  #informe-print-root,
+  #reporte-ficha-root {
+    position: static !important;
+    overflow: visible !important;
+  }
+  /* El div interior también tiene fixed + overflow-y:auto — hay que resetearlo */
+  #informe-print-root > div,
+  #reporte-ficha-root > div {
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    inset: auto !important;
+    z-index: auto !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  /* Configuración de página A4 */
+  @page {
+    size: A4;
+    margin: 15mm 18mm;
+  }
+  body {
+    background: white !important;
+    font-size: 11pt;
+  }
+}

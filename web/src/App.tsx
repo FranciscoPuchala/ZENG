@@ -6,6 +6,8 @@ import { Panel } from "@/pages/Panel"
 import { IngresoMuestra } from "@/pages/IngresoMuestra"
 import { CargaResultados } from "@/pages/CargaResultados"
 import { CuadernoAnalisis } from "@/pages/CuadernoAnalisis"
+import { EnsayosParametros } from "@/pages/EnsayosParametros"
+import { Clientes } from "@/pages/Clientes"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 
 function Proximamente({ nombre }: { nombre: string }) {
@@ -33,10 +35,14 @@ function App() {
       {active === "Ingreso de Muestra" && <IngresoMuestra />}
       {active === "Carga de Resultados" && <CargaResultados />}
       {active === "Cuaderno de Análisis" && <CuadernoAnalisis />}
+      {active === "Ensayos y Parámetros" && <EnsayosParametros />}
+      {active === "Clientes" && <Clientes />}
       {active !== "Panel" &&
         active !== "Ingreso de Muestra" &&
         active !== "Carga de Resultados" &&
-        active !== "Cuaderno de Análisis" && <Proximamente nombre={active} />}
+        active !== "Cuaderno de Análisis" &&
+        active !== "Ensayos y Parámetros" &&
+        active !== "Clientes" && <Proximamente nombre={active} />}
     </AppShell>
     </MotionConfig>
   )

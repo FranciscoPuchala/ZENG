@@ -56,6 +56,7 @@ se arma en la app, no se guarda como texto.
 - "Publicado" = informe **aprobado para publicar**.
 - "Fecha Muestra" = **fecha de muestreo**, la da el cliente, **manual**.
 - "Muestra Interna" = "Muestra" en todas las etapas = mismo contador global.
+- **Ensayos sin parámetros en la base**: algunos códigos de ensayo NO tienen parámetros cargados en `ensayo_parametros`. Esto es **intencional y correcto** — el laboratorio carga esos resultados a mano, fuera del sistema. La app no debe tratar esto como un error; simplemente muestra el ensayo sin tabla de parámetros.
 
 ## Pendiente (2ª visita al lab)
 Ver `docs/ZENG - Checklist 2a visita.pdf`. Lo grande: mapeo **ensayo → parámetros**, copia de **cada

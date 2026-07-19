@@ -26,6 +26,47 @@ app.use((req, res, next) => {
 
 // ── CLIENTES ──────────────────────────────────────────────────────────
 
+// GET /stats/panel → todos los datos del dashboard en una sola llamada
+app.get("/stats/panel", async (req, res) => {
+  const [pend, carg, publ, clts, topEns, activ, ultInf] = await Promise.all([
+    pool.query("SELECT COUNT(*)::int AS n FROM analisis WHERE estado = 'pendiente'"),
+    pool.query("SELECT COUNT(*)::int AS n FROM analisis WHERE estado = 'cargado'"),
+    pool.query("SELECT COUNT(*)::int AS n FROM informes"),
+    pool.query("SELECT COUNT(*)::int AS n FROM muestras WHERE DATE(fecha_entrada) = CURRENT_DATE"),
+    pool.query(`
+      SELECT e.codigo, e.nombre, COUNT(a.id)::int AS total
+      FROM analisis a JOIN ensayos e ON e.id = a.ensayo_id
+      GROUP BY e.id, e.codigo, e.nombre
+      ORDER BY total DESC LIMIT 8
+    `),
+    pool.query(`
+      SELECT DATE(fecha_entrada)::text AS fecha, COUNT(*)::int AS total
+      FROM muestras
+      WHERE fecha_entrada >= NOW() - INTERVAL '14 days'
+      GROUP BY DATE(fecha_entrada)
+      ORDER BY fecha
+    `),
+    pool.query(`
+      SELECT i.numero_informe, i.fecha_emision, c.nombre AS cliente_nombre,
+             COUNT(a.id)::int AS cantidad_analisis
+      FROM informes i
+      JOIN clientes c ON c.id = i.cliente_id
+      LEFT JOIN analisis a ON a.informe_id = i.id
+      GROUP BY i.id, i.numero_informe, i.fecha_emision, c.nombre
+      ORDER BY i.id DESC LIMIT 5
+    `),
+  ])
+  res.json({
+    pendientes:       pend.rows[0].n,
+    cargados:         carg.rows[0].n,
+    informes_total:   publ.rows[0].n,
+    muestras_hoy:     clts.rows[0].n,
+    top_ensayos:      topEns.rows,
+    actividad_14d:    activ.rows,
+    ultimos_informes: ultInf.rows,
+  })
+})
+
 app.get("/clientes", async (req, res) => {
   const result = await pool.query("SELECT * FROM clientes ORDER BY numero_cliente")
   res.json(result.rows)
@@ -38,6 +79,36 @@ app.post("/clientes", async (req, res) => {
     [numero_cliente, nombre, direccion, telefono]
   )
   res.status(201).json(result.rows[0])
+})
+
+// GET /clientes/:id/analisis → historial completo de un cliente
+app.get("/clientes/:id/analisis", async (req, res) => {
+  const { id } = req.params
+  const result = await pool.query(`
+    SELECT
+      a.id,
+      a.estado,
+      a.fecha_siembra,
+      m.numero_interno,
+      m.descripcion,
+      m.fecha_entrada,
+      c.numero_cliente,
+      e.codigo  AS ensayo_codigo,
+      e.nombre  AS ensayo_nombre,
+      i.id      AS informe_id,
+      i.numero_informe,
+      i.fecha_emision,
+      ROW_NUMBER() OVER (PARTITION BY m.cliente_id ORDER BY m.numero_interno)
+        AS numero_cliente_secuencial
+    FROM analisis a
+    JOIN muestras m ON m.id = a.muestra_id
+    JOIN clientes c ON c.id = m.cliente_id
+    JOIN ensayos  e ON e.id = a.ensayo_id
+    LEFT JOIN informes i ON i.id = a.informe_id
+    WHERE m.cliente_id = $1
+    ORDER BY m.numero_interno DESC
+  `, [id])
+  res.json(result.rows)
 })
 
 // ── USUARIOS ──────────────────────────────────────────────────────────
@@ -118,6 +189,27 @@ app.post("/muestras", async (req, res) => {
   res.status(201).json(muestra)
 })
 
+// DELETE /muestras/:id → borra una muestra y sus análisis (solo si todos están pendientes)
+app.delete("/muestras/:id", async (req, res) => {
+  const { id } = req.params
+  try {
+    const checkRes = await pool.query(
+      `SELECT COUNT(*) FROM analisis WHERE muestra_id = $1 AND estado != 'pendiente'`,
+      [id]
+    )
+    if (parseInt(checkRes.rows[0].count) > 0) {
+      return res.status(409).json({ error: "No se puede borrar: hay análisis que ya fueron trabajados." })
+    }
+    await pool.query(`DELETE FROM resultados WHERE analisis_id IN (SELECT id FROM analisis WHERE muestra_id = $1)`, [id])
+    await pool.query(`DELETE FROM analisis WHERE muestra_id = $1`, [id])
+    await pool.query(`DELETE FROM muestras WHERE id = $1`, [id])
+    res.json({ ok: true })
+  } catch (err) {
+    console.error("DELETE /muestras/:id →", err.message)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 // ── ANÁLISIS ──────────────────────────────────────────────────────────
 
 // GET /analisis/pendientes → análisis en estado 'pendiente' con datos de muestra, cliente y ensayo
@@ -125,7 +217,7 @@ app.get("/analisis/pendientes", async (req, res) => {
   const result = await pool.query(`
     SELECT
       a.id, a.muestra_id, a.ensayo_id,
-      m.numero_interno, m.descripcion, m.fecha_entrada,
+      m.numero_interno, m.descripcion, m.fecha_entrada, m.hora_entrada,
       c.nombre AS cliente_nombre, c.numero_cliente,
       e.codigo AS ensayo_codigo, e.nombre AS ensayo_nombre
     FROM analisis a
@@ -216,10 +308,20 @@ app.get("/analisis/cargados", async (req, res) => {
 app.post("/informes", async (req, res) => {
   const { cliente_id, numero_informe, fecha_recepcion, fecha_emision, analisis_ids } = req.body
 
+  // Derivar fecha_muestreo (de la muestra) y fecha_analisis (fecha_siembra) automáticamente
+  const datesRes = await pool.query(
+    `SELECT MIN(m.fecha_muestreo) AS fecha_muestreo, MIN(a.fecha_siembra) AS fecha_analisis
+     FROM analisis a JOIN muestras m ON m.id = a.muestra_id WHERE a.id = ANY($1::int[])`,
+    [analisis_ids]
+  )
+  const { fecha_muestreo, fecha_analisis } = datesRes.rows[0]
+
   const informeResult = await pool.query(
-    `INSERT INTO informes (cliente_id, numero_informe, fecha_recepcion, fecha_emision, publicado, fecha_publicado)
-     VALUES ($1, $2, $3, $4, true, CURRENT_DATE) RETURNING *`,
-    [cliente_id, numero_informe, fecha_recepcion || null, fecha_emision || null]
+    `INSERT INTO informes
+       (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
+     VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
+    [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
+     fecha_analisis || null, fecha_emision || null]
   )
   const informe = informeResult.rows[0]
 
@@ -231,6 +333,90 @@ app.post("/informes", async (req, res) => {
   }
 
   res.status(201).json(informe)
+})
+
+// GET /informes → lista de informes publicados (para reimprimir)
+app.get("/informes", async (req, res) => {
+  const result = await pool.query(`
+    SELECT i.id, i.numero_informe, i.fecha_emision,
+           c.nombre AS cliente_nombre, c.numero_cliente,
+           (SELECT e.codigo FROM ensayos e
+            JOIN analisis a2 ON a2.ensayo_id = e.id
+            WHERE a2.informe_id = i.id LIMIT 1) AS ensayo_codigo,
+           (SELECT e.nombre FROM ensayos e
+            JOIN analisis a2 ON a2.ensayo_id = e.id
+            WHERE a2.informe_id = i.id LIMIT 1) AS ensayo_nombre,
+           (SELECT COUNT(*) FROM analisis a2 WHERE a2.informe_id = i.id) AS cantidad_analisis
+    FROM informes i
+    JOIN clientes c ON c.id = i.cliente_id
+    ORDER BY i.id DESC
+    LIMIT 100
+  `)
+  res.json(result.rows)
+})
+
+// GET /informes/:id/reporte → todos los datos para imprimir el informe
+app.get("/informes/:id/reporte", async (req, res) => {
+  const { id } = req.params
+
+  // Informe + cliente
+  const infRes = await pool.query(`
+    SELECT i.*, c.nombre AS cliente_nombre, c.numero_cliente,
+           c.direccion, c.telefono, c.fax
+    FROM informes i JOIN clientes c ON c.id = i.cliente_id
+    WHERE i.id = $1
+  `, [id])
+  if (infRes.rows.length === 0) return res.status(404).json({ error: "No encontrado" })
+  const informe = infRes.rows[0]
+
+  // Análisis del informe con datos de muestra, ensayo y contador por cliente
+  const analisisRes = await pool.query(`
+    SELECT a.id, a.fecha_siembra, a.ensayo_id,
+           m.numero_interno, m.descripcion,
+           e.codigo AS ensayo_codigo, e.nombre AS ensayo_nombre,
+           ROW_NUMBER() OVER (PARTITION BY m.cliente_id ORDER BY m.numero_interno)
+             AS numero_cliente_secuencial
+    FROM analisis a
+    JOIN muestras m ON m.id = a.muestra_id
+    JOIN ensayos  e ON e.id = a.ensayo_id
+    WHERE a.informe_id = $1
+    ORDER BY m.numero_interno
+  `, [id])
+
+  // Resultados por análisis
+  const analisis = []
+  for (const a of analisisRes.rows) {
+    const resRes = await pool.query(`
+      SELECT p.descripcion, p.unidad, r.valor, r.lectura_dilucion,
+             COALESCE(ep.orden, 999) AS orden
+      FROM resultados r
+      JOIN parametros p ON p.id = r.parametro_id
+      LEFT JOIN ensayo_parametros ep ON ep.parametro_id = p.id AND ep.ensayo_id = $2
+      WHERE r.analisis_id = $1
+      ORDER BY orden, p.codigo
+    `, [a.id, a.ensayo_id])
+    analisis.push({ ...a, resultados: resRes.rows })
+  }
+
+  // Metodologías del ensayo del primer análisis
+  const ensayoId = analisisRes.rows[0]?.ensayo_id
+  let metodologias = []
+  if (ensayoId) {
+    const metRes = await pool.query(`
+      SELECT m.codigo, m.descripcion
+      FROM metodologias m
+      JOIN ensayo_metodologias em ON em.metodologia_id = m.id
+      WHERE em.ensayo_id = $1
+      ORDER BY em.orden, m.codigo
+    `, [ensayoId])
+    metodologias = metRes.rows
+  }
+
+  const ensayo = analisisRes.rows[0]
+    ? { codigo: analisisRes.rows[0].ensayo_codigo, nombre: analisisRes.rows[0].ensayo_nombre }
+    : { codigo: "—", nombre: "—" }
+
+  res.json({ informe, ensayo, analisis, metodologias })
 })
 
 // POST /analisis/:id/resultados → guarda los valores y pasa el análisis a 'cargado'

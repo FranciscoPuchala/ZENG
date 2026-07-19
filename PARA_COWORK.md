@@ -336,3 +336,60 @@ También se corrigió el endpoint existente `GET /ensayos/:id/parametros` que es
 4. **PDF Informe de Ensayo** — después de cerrar el formato en la 2ª visita
 
 *Actualizado por Claude Code el 16/07/2026.*
+
+---
+
+## Sesión — 17 jul 2026 — CATÁLOGO REAL CARGADO + SELECTOR DE ENSAYOS
+
+### Resumen ejecutivo
+
+Se cargaron los 5 CSVs del catálogo real del laboratorio y se mejoró la UI de selección de ensayos en Etapa 1, que con 151 opciones no podía seguir siendo una lista de etiquetas.
+
+### Catálogo real cargado ✅
+
+Los CSVs de Cowork llegaron y se cargaron con el script `api/seed_catalogos.js`:
+
+```
+node api/seed_catalogos.js
+```
+
+Resultado:
+- **151 ensayos** cargados
+- **149 parámetros** (los 158 del CSV; 0052 ya existía y se actualizó su descripción a "Enterobacterias (ufc/g)")
+- **68 metodologías**
+- **376 relaciones** ensayo→parámetro
+- **283 relaciones** ensayo→metodología
+
+Verificación automática al final del script: ensayo `01` (Potabilidad) quedó con **4 parámetros** y **3 metodologías** ✅
+
+El script usa `ON CONFLICT DO UPDATE` en todos los inserts, por lo que se puede volver a correr sin duplicar datos.
+
+### Selector de ensayos en Etapa 1 rediseñado ✅
+
+`web/src/pages/IngresoMuestra.tsx` — sección Ensayos reemplazada:
+
+**Antes:** lista de etiquetas/pills (inmanejable con 151 opciones).
+
+**Ahora:**
+- **Chips removibles** en la parte superior: muestran los ensayos ya seleccionados con botón `×` para quitarlos.
+- **Campo de búsqueda**: filtra por código (`138`) o nombre (`salmo`, `entero`, etc.) al instante.
+- **Lista scrollable** (176px de alto): todos los ensayos navegables, con checkbox teal visual. Los seleccionados quedan resaltados aunque no estén en el viewport.
+- Al limpiar el formulario, se vacían los ensayos seleccionados y el campo de búsqueda.
+
+### Estado actual del proyecto
+
+| Componente | Estado |
+|---|---|
+| Etapa 1 — Ingreso de Muestra | ✅ Funciona de punta a punta |
+| Etapa 2 — Carga de Resultados | ✅ Funciona de punta a punta |
+| Etapa 3 — Cuaderno de Análisis | ✅ Funciona de punta a punta |
+| Catálogo real (151 ensayos, 149 parámetros, 68 metodologías) | ✅ Cargado en la base |
+| Informe de Ensayo PDF | ⏳ Pendiente 2ª visita |
+
+### Lo que falta / próximos pasos sugeridos
+
+1. **Pantalla Panel** — conectar las 4 stat tiles a datos reales (muestras hoy, pendientes, cargados, publicados)
+2. **Pantallas Clientes y Ensayos** — gestión del catálogo (alta/baja desde la app)
+3. **PDF Informe de Ensayo** — después de cerrar el formato exacto con el laboratorio
+
+*Actualizado por Claude Code el 17/07/2026.*
