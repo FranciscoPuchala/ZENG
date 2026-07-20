@@ -731,3 +731,145 @@ Se decidió no construir la pantalla de Configuración → Usuarios en esta sesi
 | Confirmaciones del lab (formatos de informe, parámetros, etc.) | ⏳ Esperando — ver sección anterior |
 
 *Actualizado por Claude Code el 19/07/2026.*
+
+---
+
+## Sesion — 19 jul 2026 (noche) — BACKUPS AUTOMATICOS COMPLETOS
+
+### Resumen ejecutivo
+
+Sistema de backups automaticos de PostgreSQL completamente funcional y probado. Los backups corren solos sin que nadie tenga que hacer nada.
+
+### Scripts creados — `scripts/`
+
+**`scripts/backup_frecuente.ps1`**
+- Corre `pg_dump` de la base `zeng` en formato comprimido (`-F c`)
+- Guarda en `$DESTINO\backups_zeng\frecuentes\zeng_YYYY-MM-DD_HH-mm.dump`
+- Borra archivos de mas de 7 dias automaticamente
+- Lee la contrasena de postgres directamente del `api/.env` (no hay contrasena en el repo)
+- Escribe una linea en `$DESTINO\backups_zeng\backup.log` con fecha + OK/ERROR
+
+**`scripts/backup_diario.ps1`**
+- Igual pero guarda en `$DESTINO\backups_zeng\diarios\zeng_YYYY-MM-DD.dump`
+- Retiene 365 dias
+
+**Configuracion:** la variable `$DESTINO` esta arriba de cada script. Hoy apunta a la carpeta `respaldo` del escritorio (prueba). En produccion cambiarla por la letra del disco externo de 2TB (ej. `E:\`).
+
+### Tareas programadas de Windows creadas
+
+| Tarea | Horario | Script |
+|---|---|---|
+| `ZENG_Backup_Frecuente` | Cada 30 min, 08:00-20:00 | `backup_frecuente.ps1` |
+| `ZENG_Backup_Diario` | Todos los dias 23:00 | `backup_diario.ps1` |
+
+Creadas con PowerShell como Administrador. Estado: Ready. Para verificar: Inicio -> "Programador de tareas".
+
+### Como verificar que los backups estan corriendo
+
+1. **El log:** `respaldo\backups_zeng\backup.log` — cada ejecucion agrega una linea con fecha + OK/ERROR
+2. **Programador de tareas:** ver columna "Ultima ejecucion" de `ZENG_Backup_Frecuente`
+3. **Los archivos:** en `respaldo\backups_zeng\frecuentes\` deben aparecer archivos nuevos cada 30 min
+
+### Restauracion probada y verificada
+
+Se restauro el backup en `zeng_test` y se verifico: 4 clientes, 5 usuarios, 151 ensayos. Todo OK.
+
+Comando de restauracion de emergencia:
+```
+pg_restore -U postgres -d zeng "ruta\al\backup.dump"
+```
+
+### Pendiente — Cuando llegue el disco externo de 2TB
+
+En cada script cambiar:
+```powershell
+$DESTINO = "C:\Users\franp\OneDrive\Escritorio\respaldo"
+```
+Por la letra real del disco (ej. `E:\`). Y volver a probar que los archivos aparecen ahi.
+
+*Actualizado por Claude Code el 19/07/2026.*
+
+---
+
+## Sesion — 19 jul 2026 (madrugada) — RESTAURACION MEJORADA + PRIVACIDAD CLIENTE
+
+### Resumen ejecutivo
+
+Dos mejoras sobre lo construido esta noche: la pantalla de Respaldo ahora permite elegir de qué backup restaurar (con vista previa del contenido), y el selector de cliente en Ingreso de Muestra ya no muestra nombres a la vista.
+
+---
+
+### Bug corregido — restauracion usaba backup incorrecto
+
+El endpoint `POST /backup/restaurar` solo buscaba en `frecuentes/` y podía restaurar un archivo mas viejo que el que había en `diarios/`. Ahora compara los dos y elige el mas reciente por fecha de modificacion. Ademas se acepta exit code 1 (warnings) como exito, que es lo que devuelve pg_restore con `--clean` en bases con objetos que no existen todavia.
+
+---
+
+### Seleccion de backup + vista previa — `api/index.js` + `web/src/pages/Respaldo.tsx` ✅
+
+#### Nuevos endpoints
+
+| Metodo | Ruta | Que hace |
+|---|---|---|
+| GET | `/backup/lista` | Lista los ultimos 15 dumps de `frecuentes/` + 15 de `diarios/`, ordenados por fecha |
+| POST | `/backup/preview` | Restaura el dump elegido en `zeng_preview_restore` (base temporal), consulta clientes + informes, borra la base temporal y devuelve el resultado |
+
+**Detalle de `/backup/preview`:**
+- Corre `dropdb --if-exists zeng_preview_restore` + `createdb` + `pg_restore --no-owner --no-privileges`
+- Consulta clientes + sus numeros de informe (con `json_agg`)
+- Siempre hace `dropdb` al final (sea OK o error)
+- Timeout de 60s para pg_restore de preview; 120s para el restaurar real
+
+**`POST /backup/restaurar` actualizado:**
+- Acepta `{ archivo, carpeta }` en el body → restaura ese archivo especifico
+- Si no viene body, usa el mas reciente de cualquier carpeta (fallback)
+- Acepta exit code 0 o 1 como exito
+
+#### Nuevo flujo del modal en Respaldo
+
+El boton "Restaurar" ahora abre un modal en 3 pasos:
+
+1. **Lista de backups** scrollable (frecuentes en teal, diarios en azul) con fecha, tipo y tamaño
+2. Click en uno → spinner + llamada a `/backup/preview` (puede tardar segundos)
+3. Tabla de **clientes con sus numeros de informe** del backup seleccionado
+4. Recien entonces aparece el campo para escribir `CONFIRMAR` y el boton se habilita
+
+---
+
+### Selector de cliente en Ingreso de Muestra — solo codigos ✅
+
+`web/src/pages/IngresoMuestra.tsx`
+
+El laboratorio pidio que los nombres de los clientes no sean visibles al momento de seleccion:
+
+- **Lista desplegable:** ahora solo muestra `{numero_cliente}`, sin nombre
+- **Chip de seleccionado:** antes mostraba "026 A — Nombre del cliente"; ahora solo "026 A"
+- **Buscador:** filtra solo por `numero_cliente`, no por nombre
+- La tabla de "Muestras recientes" y la pantalla Clientes no fueron tocadas
+
+---
+
+### Estado actual del proyecto (19 jul 2026, madrugada)
+
+| Componente | Estado |
+|---|---|
+| Sistema de login (DB + backend + frontend) | ✅ Completo |
+| Backups automaticos (frecuentes + diarios) | ✅ Funcionando con tareas programadas |
+| Pantalla Respaldo | ✅ Estado, countdown, historial, seleccion de backup, vista previa, restauracion con CONFIRMAR |
+| Etapa 1 — Ingreso de Muestra | ✅ Funciona (selector de cliente solo muestra codigos) |
+| Etapa 2 — Carga de Resultados | ✅ Funciona de punta a punta |
+| Etapa 3 — Cuaderno de Analisis | ✅ Funciona de punta a punta |
+| Informe de Ensayo (impresion) | ✅ Renderizado HTML, imprime desde el navegador |
+| Panel con datos reales | ✅ Stats, graficos, reloj, ultimos informes |
+| Pantalla Clientes | ✅ Lista + historial + reimpresion |
+| Gestion de usuarios desde la app | ⏳ Pendiente (hoy solo desde terminal/psql) |
+| Confirmaciones del lab (formatos de informe, parametros, etc.) | ⏳ Esperando |
+
+### Pendientes principales
+
+1. Cuando llegue el disco externo de 2TB: cambiar `$DESTINO` en los scripts de backup y `BACKUP_LOG` en `api/.env`
+2. Recibir confirmaciones del lab: valores predeterminados en parametros, tipo presencia, header/footer PDF, formatos especiales (01, 121)
+3. Cargar clientes reales desde el sistema actual
+4. Pantalla de gestion de usuarios (baja prioridad)
+
+*Actualizado por Claude Code el 19/07/2026.*

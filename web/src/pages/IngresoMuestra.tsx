@@ -190,8 +190,6 @@ export function IngresoMuestra() {
                 return (
                   <span className="flex w-fit items-center gap-1.5 rounded-full border border-teal-300 bg-teal-50 px-3 py-1 text-sm font-medium text-teal-700">
                     <span className="font-mono text-xs">{sel?.numero_cliente}</span>
-                    <span className="text-teal-400">—</span>
-                    {sel?.nombre}
                     <button
                       type="button"
                       onClick={() => { setClienteId(""); setBusquedaCliente("") }}
@@ -209,7 +207,7 @@ export function IngresoMuestra() {
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
-                    placeholder="Buscar por nombre o número…"
+                    placeholder="Buscar por código…"
                     className={["pl-8", intentoGuardar && !clienteId ? "border-red-400 ring-1 ring-red-400" : ""].join(" ")}
                     value={busquedaCliente}
                     onChange={e => setBusquedaCliente(e.target.value)}
@@ -220,7 +218,6 @@ export function IngresoMuestra() {
                   {(() => {
                     const filtrados = clientes.filter(c =>
                       busquedaCliente === "" ||
-                      c.nombre.toLowerCase().includes(busquedaCliente.toLowerCase()) ||
                       c.numero_cliente.toLowerCase().includes(busquedaCliente.toLowerCase())
                     )
                     return filtrados.length === 0 ? (
@@ -234,12 +231,11 @@ export function IngresoMuestra() {
                             <button
                               type="button"
                               onClick={() => { setClienteId(String(c.id)); setBusquedaCliente("") }}
-                              className="flex w-full items-center gap-2.5 border-b border-border px-3 py-2 text-left text-sm last:border-0 transition-colors hover:bg-muted/50"
+                              className="flex w-full items-center border-b border-border px-3 py-2 text-left last:border-0 transition-colors hover:bg-muted/50"
                             >
-                              <span className="w-12 shrink-0 font-mono text-xs font-semibold text-teal-700">
+                              <span className="font-mono text-sm font-semibold text-teal-700">
                                 {c.numero_cliente}
                               </span>
-                              <span>{c.nombre}</span>
                             </button>
                           </li>
                         ))}

@@ -3,6 +3,9 @@ import express from "express"
 import pg from "pg"
 import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
+import fs from "fs"
+import path from "path"
+import { spawnSync } from "child_process"
 
 const JWT_SECRET = process.env.JWT_SECRET
 const SALT_ROUNDS = 10
@@ -503,6 +506,151 @@ app.post("/analisis/:id/resultados", async (req, res) => {
   }
 
   res.json({ ok: true })
+})
+
+// ── BACKUP ────────────────────────────────────────────────────────────
+
+// GET /backup/status → lee el log de backups y devuelve las últimas entradas
+app.get("/backup/status", auth, (req, res) => {
+  const logPath = process.env.BACKUP_LOG
+  if (!logPath) return res.status(500).json({ error: "BACKUP_LOG no configurado en .env" })
+
+  try {
+    const contenido = fs.readFileSync(logPath, "utf8")
+    const lineas = contenido.trim().split("\n").filter(l => l.trim())
+
+    const parsear = (linea) => {
+      const m = linea.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\s+(OK-DIA|OK|ERROR)\s+(.*)$/)
+      if (!m) return null
+      return { fecha: m[1], estado: m[2], detalle: m[3].trim() }
+    }
+
+    const entradas = lineas.slice(-30).reverse().map(parsear).filter(Boolean)
+    res.json({ entradas })
+  } catch (e) {
+    if (e.code === "ENOENT") return res.json({ entradas: [], sin_log: true })
+    res.status(500).json({ error: e.message })
+  }
+})
+
+// GET /backup/lista → devuelve los dumps disponibles de frecuentes y diarios
+app.get("/backup/lista", auth, (req, res) => {
+  const logPath = process.env.BACKUP_LOG
+  if (!logPath) return res.status(500).json({ error: "BACKUP_LOG no configurado" })
+
+  const backupBase = path.dirname(logPath)
+  const resultado  = []
+
+  for (const carpeta of ["frecuentes", "diarios"]) {
+    const dir = path.join(backupBase, carpeta)
+    try {
+      const archivos = fs.readdirSync(dir).filter(f => f.endsWith(".dump")).sort().reverse().slice(0, 15)
+      for (const f of archivos) {
+        const stat = fs.statSync(path.join(dir, f))
+        resultado.push({ archivo: f, carpeta, fecha_mod: stat.mtime.toISOString(), tamano: stat.size })
+      }
+    } catch { /* carpeta vacía o inexistente */ }
+  }
+
+  resultado.sort((a, b) => new Date(b.fecha_mod) - new Date(a.fecha_mod))
+  res.json({ backups: resultado })
+})
+
+// POST /backup/preview → restaura un dump en base temporal y devuelve clientes + informes
+app.post("/backup/preview", auth, async (req, res) => {
+  const { archivo, carpeta } = req.body
+  const logPath = process.env.BACKUP_LOG
+  if (!logPath) return res.status(500).json({ error: "BACKUP_LOG no configurado" })
+
+  const fullPath = path.join(path.dirname(logPath), carpeta, archivo)
+  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: "Archivo no encontrado" })
+
+  const pgBin  = "C:\\Program Files\\PostgreSQL\\18\\bin"
+  const env    = { ...process.env, PGPASSWORD: process.env.DB_PASSWORD }
+  const tempDb = "zeng_preview_restore"
+
+  spawnSync(path.join(pgBin, "dropdb.exe"),   ["-U", process.env.DB_USER, "--if-exists", tempDb], { env })
+  const cr = spawnSync(path.join(pgBin, "createdb.exe"), ["-U", process.env.DB_USER, tempDb], { env })
+  if (cr.status !== 0) return res.status(500).json({ error: "No se pudo crear la base temporal" })
+
+  const rr = spawnSync(
+    path.join(pgBin, "pg_restore.exe"),
+    ["-U", process.env.DB_USER, "--no-owner", "--no-privileges", "-d", tempDb, fullPath],
+    { env, timeout: 60000 }
+  )
+
+  if (rr.status === null || rr.status > 1) {
+    spawnSync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, tempDb], { env })
+    return res.status(500).json({ error: "Error al leer el backup" })
+  }
+
+  const tempPool = new pg.Pool({
+    host: process.env.DB_HOST, port: process.env.DB_PORT,
+    database: tempDb, user: process.env.DB_USER, password: process.env.DB_PASSWORD
+  })
+  try {
+    const result = await tempPool.query(`
+      SELECT c.numero_cliente, c.nombre,
+             COUNT(DISTINCT i.id)::int AS total_informes,
+             COALESCE(
+               json_agg(
+                 json_build_object('numero', i.numero_informe, 'fecha', TO_CHAR(i.fecha_emision, 'DD/MM/YYYY'))
+                 ORDER BY i.id
+               ) FILTER (WHERE i.id IS NOT NULL),
+               '[]'::json
+             ) AS informes
+      FROM clientes c
+      LEFT JOIN informes i ON i.cliente_id = c.id
+      GROUP BY c.id, c.numero_cliente, c.nombre
+      ORDER BY c.numero_cliente
+    `)
+    res.json({ clientes: result.rows })
+  } finally {
+    await tempPool.end()
+    spawnSync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, tempDb], { env })
+  }
+})
+
+// POST /backup/restaurar → restaura el backup elegido sobre la base zeng (solo admin)
+app.post("/backup/restaurar", auth, (req, res) => {
+  if (req.usuario.rol !== "admin") return res.status(403).json({ error: "Solo el admin puede restaurar" })
+
+  const logPath = process.env.BACKUP_LOG
+  if (!logPath) return res.status(500).json({ error: "BACKUP_LOG no configurado" })
+
+  const backupBase = path.dirname(logPath)
+  let ultimo
+
+  if (req.body?.archivo && req.body?.carpeta) {
+    ultimo = path.join(backupBase, req.body.carpeta, req.body.archivo)
+    if (!fs.existsSync(ultimo)) return res.status(404).json({ error: "Archivo no encontrado" })
+  } else {
+    const candidatos = []
+    for (const carpeta of ["frecuentes", "diarios"]) {
+      const dir = path.join(backupBase, carpeta)
+      try {
+        fs.readdirSync(dir).filter(f => f.endsWith(".dump")).forEach(f => candidatos.push(path.join(dir, f)))
+      } catch { }
+    }
+    if (candidatos.length === 0) return res.status(404).json({ error: "No hay backups disponibles" })
+    candidatos.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)
+    ultimo = candidatos[0]
+  }
+
+  const pgBin = "C:\\Program Files\\PostgreSQL\\18\\bin"
+  const env   = { ...process.env, PGPASSWORD: process.env.DB_PASSWORD }
+
+  const result = spawnSync(
+    path.join(pgBin, "pg_restore.exe"),
+    ["-U", process.env.DB_USER, "--clean", "--if-exists", "-d", process.env.DB_NAME, ultimo],
+    { env, timeout: 120000 }
+  )
+
+  if (result.status === 0 || result.status === 1) {
+    res.json({ ok: true, archivo: path.basename(ultimo) })
+  } else {
+    res.status(500).json({ error: result.stderr?.toString() || "Error en pg_restore" })
+  }
 })
 
 // ── INICIO ────────────────────────────────────────────────────────────

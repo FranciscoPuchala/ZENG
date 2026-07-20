@@ -9,6 +9,7 @@ import {
   Beaker,
   Settings,
   LogOut,
+  DatabaseBackup,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { UsuarioSesion } from "@/lib/auth"
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Cuaderno de Análisis", icon: FileCheck2,    etapa: "Etapa 3" },
   { label: "Clientes",             icon: Users },
   { label: "Ensayos y Parámetros", icon: Beaker },
+  { label: "Respaldo",             icon: DatabaseBackup },
 ]
 
 export function AppShell({

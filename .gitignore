@@ -10,3 +10,5 @@ Thumbs.db
 # Backups / temporales
 *.bak
 *.tmp
+# Contraseña de backup (nunca al repo)
+scripts/backup_password.ps1

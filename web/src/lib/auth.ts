@@ -10,15 +10,15 @@ export interface UsuarioSesion {
 }
 
 export function guardarToken(token: string) {
-  localStorage.setItem(KEY, token)
+  sessionStorage.setItem(KEY, token)
 }
 
 export function leerToken(): string | null {
-  return localStorage.getItem(KEY)
+  return sessionStorage.getItem(KEY)
 }
 
 export function borrarToken() {
-  localStorage.removeItem(KEY)
+  sessionStorage.removeItem(KEY)
 }
 
 // Lee el payload del JWT guardado (sin verificar firma, solo para mostrar datos)
