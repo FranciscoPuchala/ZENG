@@ -1,7 +1,6 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { guardarToken, type UsuarioSesion } from "@/lib/auth"
-
-const API = "http://localhost:3001"
 
 export function Login({ onLogin }: { onLogin: (u: UsuarioSesion) => void }) {
   const [usuario,  setUsuario]  = React.useState("")

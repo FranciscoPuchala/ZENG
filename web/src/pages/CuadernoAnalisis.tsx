@@ -1,4 +1,5 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { FileCheck2, CheckCircle2, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Toast } from "@/components/ui/toast"
@@ -37,8 +38,6 @@ interface InformePublicado {
   ensayo_nombre: string | null
   cantidad_analisis: number
 }
-
-const API = "http://localhost:3001"
 
 function formatFecha(iso: string | null) {
   if (!iso) return "—"

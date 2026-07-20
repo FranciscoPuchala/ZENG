@@ -6,9 +6,11 @@ import jwt from "jsonwebtoken"
 import fs from "fs"
 import path from "path"
 import { spawnSync } from "child_process"
+import { fileURLToPath } from "url"
 
 const JWT_SECRET = process.env.JWT_SECRET
 const SALT_ROUNDS = 10
+const __dirname   = path.dirname(fileURLToPath(import.meta.url))
 
 // --- Conexión a PostgreSQL ---
 const pool = new pg.Pool({
@@ -654,7 +656,15 @@ app.post("/backup/restaurar", auth, (req, res) => {
 })
 
 // ── INICIO ────────────────────────────────────────────────────────────
-const PORT = 3001
+const PORT = Number(process.env.PORT) || 3001
+
+// En produccion: sirve el frontend compilado (web/dist) desde el mismo proceso
+const distPath = path.join(__dirname, "..", "web", "dist")
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath))
+  app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")))
+}
+
 app.listen(PORT, () => {
   console.log(`Servidor ZENG corriendo en http://localhost:${PORT}`)
 })

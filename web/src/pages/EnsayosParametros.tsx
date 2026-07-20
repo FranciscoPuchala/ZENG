@@ -1,4 +1,5 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { Search, Beaker } from "lucide-react"
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent,
@@ -20,8 +21,6 @@ interface Plantilla {
   parametros: Parametro[]
   metodologias: Metodologia[]
 }
-
-const API = "http://localhost:3001"
 
 export function EnsayosParametros() {
   const [ensayos, setEnsayos] = React.useState<Ensayo[]>([])

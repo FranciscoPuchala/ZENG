@@ -1,8 +1,7 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { ClipboardList, FlaskConical, FileCheck2, CalendarCheck } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-
-const API = "http://localhost:3001"
 
 interface Stats {
   pendientes: number

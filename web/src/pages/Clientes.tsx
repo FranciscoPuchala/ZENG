@@ -1,4 +1,5 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { Search, Users, ChevronRight, Printer } from "lucide-react"
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent,
@@ -34,8 +35,6 @@ interface AnalisisCliente {
   fecha_emision: string | null
   numero_cliente_secuencial: number
 }
-
-const API = "http://localhost:3001"
 
 function ddmmaa(iso: string | null) {
   if (!iso) return "—"

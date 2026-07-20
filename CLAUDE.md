@@ -149,39 +149,51 @@ Modelo **cliente-servidor** con **una sola base compartida**:
 - **De dev a prod:** hoy todo corre en `localhost`. En prod: Postgres + backend en el servidor, y el frontend (`web`) apunta su URL de API a la IP del servidor (variable de entorno). Es cambio de config, no rehacer nada.
 - **Servidor:** una de las 4 PC (la más confiable, siempre prendida) o un equipo dedicado (mini-PC / Raspberry). A definir.
 
-## Tarea actual (jul 2026) — Backups automáticos de la base al disco externo (2 TB), PASO A PASO
+## Tarea actual (jul 2026) — Paquete de instalación del servidor (carpeta `deploy/`), PASO A PASO
 
 > **IMPORTANTE para Claude Code:** Francisco está aprendiendo. Explicá cada paso simple, de a
-> UNO, esperá que confirme, y enseñá el concepto (qué es pg_dump, una tarea programada, `.pgpass`, etc.).
+> UNO, esperá que confirme, y enseñá el concepto (qué es un build de producción, un servicio de
+> Windows, el firewall, etc.). Es una tarea grande: hacerla por etapas.
 
-**Contexto y decisiones (tomadas con Francisco):**
-- Respaldar la base `zeng` (los DATOS; el código ya está en GitHub).
-- **Cada 30 min** en horario de trabajo, al **disco externo de 2 TB** (carpeta dedicada; la letra del disco la define Francisco → hacerlo **configurable** arriba del script).
-- **Rotación generosa** (2 TB sobra): frecuentes cada 30 min retenidos ~7 días + **1 diario** retenido ~1 año.
-- **Sin copia off-site por ahora** (solo el disco externo).
-- El backup **no** necesita la app corriendo, solo PostgreSQL.
+**Objetivo:** crear en el repo una carpeta **`deploy/`** con scripts + instructivo para montar
+TODO el sistema en **una sola PC (el servidor)** — la que corre PostgreSQL + backend, siempre
+prendida. Las otras 3 PC **no** llevan nada instalado: solo abren el navegador apuntando a la IP
+del servidor. Meta: instalar el servidor = "correr un script + un par de datos".
+(Ver la sección "Despliegue en producción" de este archivo.)
 
-### Paso 1 — Script de backup (PowerShell recomendado; nativo de Windows, no necesita Node)
-- Corre `pg_dump` de `zeng` en formato comprimido (`-F c`) → `<DISCO>:\backups_zeng\frecuentes\zeng_YYYY-MM-DD_HH-mm.dump`.
-  - La letra del disco = variable configurable arriba del script.
-  - Contraseña: usar `.pgpass` o la variable `PGPASSWORD` (NO hardcodear en el repo).
-  - Requiere el PATH de Postgres (`C:\Program Files\PostgreSQL\18\bin`).
-- Borra de `frecuentes/` los backups con más de **7 días**.
-- Escribe una línea en un **log** (`backups_zeng\backup.log`): fecha + OK/ERROR.
+### Paso 1 — Preparar la app para producción (un solo proceso)
+- Hoy en dev corren separados: frontend (`web`, :5173) y backend (`api`, :3001). En producción,
+  **una sola app:** hacer el **build del frontend** (`cd web && npm run build` → `web/dist`) y que
+  el **backend (Express) sirva ese build** como estáticos, en un solo puerto.
+- El frontend hoy llama a `http://localhost:3001` **hardcodeado** → cambiarlo a **ruta relativa**
+  (mismo origen) o a una variable `VITE_API_URL`, para que en el servidor apunte bien.
 
-### Paso 2 — Backup diario
-- Una vez al día (ej. 23:00): un dump a `<DISCO>:\backups_zeng\diarios\zeng_YYYY-MM-DD.dump`, y borra los `diarios/` de más de **365 días**.
+### Paso 2 — Script de instalación (PowerShell, en `deploy/`)
+Que en la PC servidor haga:
+1. Verifica que estén **PostgreSQL** y **Node** (o guía para instalarlos).
+2. Crea la base `zeng` y corre en orden: `db/zeng_esquema_v1.sql`, `db/migracion_v2.sql`,
+   `db/migracion_login.sql`, y los seeds (catálogos + `api/crear_admin.js` para el primer admin).
+3. Instala deps del backend (`cd api && npm install`) y genera el `.env` desde una plantilla
+   (pide la contraseña de Postgres y genera el `JWT_SECRET`).
+4. Build del frontend y backend sirviéndolo.
+5. Deja el **backend en auto-arranque** (servicio de Windows con NSSM, o pm2 + pm2-startup, o
+   tarea "al iniciar"). PostgreSQL ya arranca solo como servicio.
+6. Configura el **firewall de Windows** para permitir el puerto del servidor en la LAN, y muestra
+   la **IP del servidor** (las otras PC entran por `http://IP:puerto`).
 
-### Paso 3 — Programar con el Programador de tareas de Windows
-- Una tarea que corra el script **cada 30 min** en horario de trabajo (ej. 08–20 h), y otra **diaria**.
-- Que se ejecuten **aunque nadie esté logueado** y que **sobrevivan a reinicios**.
+### Paso 3 — Backups (parte del servidor)
+- Instalar el backup automático decidido: `pg_dump` de `zeng` **cada 30 min** (horario de trabajo)
+  al **disco externo de 2 TB** + **1 diario**, con rotación (frecuentes ~7 días, diarios ~1 año),
+  **log** de OK/ERROR, y programado con el **Programador de tareas**. Script(s) en `deploy/` o
+  `scripts/`. **Probar una restauración** para confirmar que sirve.
 
-### Paso 4 — Probar la restauración (clave)
-- Restaurar un backup en una base temporal (`pg_restore` → `zeng_test`) para confirmar que **sirve de verdad**. Documentar el comando de restore.
+### Paso 4 — `.env.example` + README de instalación
+- `deploy/.env.example` con todas las variables (DB_*, JWT_SECRET, PUERTO, carpeta de backups).
+- `deploy/README.md` paso a paso: prerequisitos, correr el script, cómo verificar que anda, cómo
+  entran las otras PC, cómo **actualizar** (git pull + rebuild + reiniciar el backend) y qué hacer
+  si algo falla (apoyarse en `docs/GUIA_BASE_DE_DATOS.md`).
 
-### Paso 5 — Guardar en el repo
-- Script(s) en `scripts/`, con un README corto: cómo configurar (letra del disco, horario) y cómo restaurar.
-
-**Verificación:** que quede fácil ver "último backup OK" (el log, o mostrarlo en algún lado a futuro). Un backup que nadie chequea puede fallar en silencio.
+**Nota:** esto es **preparar el paquete**. NO poner en producción real hasta cerrar el Informe de
+Ensayo (faltan las confirmaciones del lab).
 
 Al terminar la sesión, actualizá `PARA_COWORK.md`.

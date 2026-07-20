@@ -873,3 +873,74 @@ El laboratorio pidio que los nombres de los clientes no sean visibles al momento
 4. Pantalla de gestion de usuarios (baja prioridad)
 
 *Actualizado por Claude Code el 19/07/2026.*
+
+---
+
+## Sesion — 20 jul 2026 — PAQUETE DE DEPLOY COMPLETO
+
+### Resumen ejecutivo
+
+Se completo el paquete de instalacion del servidor (`deploy/`) y se refactorizo la URL de la API en el frontend para que en produccion use rutas relativas (mismo origen) en lugar del localhost hardcodeado.
+
+### Paso 1 — Frontend en modo produccion ✅
+
+**`web/src/lib/api.ts`** (nuevo):
+```ts
+export const API = (import.meta.env.VITE_API_URL as string | undefined) ?? ""
+```
+- En produccion: `API = ""` → todas las rutas son relativas (ej. `/clientes`) → mismo origen que el servidor
+- En desarrollo: `API = "http://localhost:3001"` via `web/.env.development`
+
+Los 9 archivos de paginas (`*.tsx`) se actualizaron para importar `{ API } from "@/lib/api"` en lugar de tener `const API = "http://localhost:3001"` hardcodeado en cada uno.
+
+**`api/index.js`** modificado:
+- `PORT` ahora viene de `process.env.PORT` (configurable desde `.env`)
+- En produccion: Express sirve `web/dist/` como estaticos con `express.static()` + fallback SPA
+- En dev: `web/dist/` no existe, el fallback no se registra, el frontend sigue en :5173 como antes
+
+### Paso 2 — Scripts de backup refactorizados ✅
+
+`scripts/backup_frecuente.ps1` y `scripts/backup_diario.ps1` reescritos: ya no tienen ninguna ruta hardcodeada de Francisco. Toda la configuracion (`PG_BIN`, `BACKUP_DESTINO`, `DB_PASSWORD`) se lee del `api/.env` via la funcion `Read-EnvVar` y `$PSScriptRoot`. Si una variable no esta en el `.env`, hay fallback por defecto (`PG_BIN = C:\Program Files\PostgreSQL\18\bin`, `DESTINO = D:\`).
+
+### Paso 3 — `deploy/instalar.ps1` ✅
+
+Script PowerShell para instalar todo en la PC servidor (Administrador). Hace en orden:
+1. Verifica Node.js (v18+) y PostgreSQL (busca pg_dump.exe en versiones 18/17/16/15)
+2. Pide contrasena de postgres, puerto (default 3001), carpeta de backups (default `D:\`)
+3. Prueba la conexion a Postgres
+4. Crea la base `zeng` y corre migraciones: `zeng_esquema_v1.sql`, `migracion_v2.sql`, `migracion_login.sql`
+5. Genera `api/.env` con JWT_SECRET aleatorio de 48 bytes
+6. `npm install` del backend + corre `api/crear_admin.js`
+7. `npm install` + `npm run build` del frontend
+8. Registra 3 tareas programadas: `ZENG_Backend` (arranque con Windows), `ZENG_Backup_Frecuente` (08:00-19:00 cada 30 min), `ZENG_Backup_Diario` (23:00)
+9. Abre el puerto en el firewall con `New-NetFirewallRule`
+10. Muestra la IP del servidor (las otras PCs entran por `http://IP:puerto`)
+
+### Paso 4 — `deploy/.env.example` y `deploy/README.md` ✅
+
+**`deploy/.env.example`:** plantilla con todas las variables del `api/.env`.
+
+**`deploy/README.md`:** guia de instalacion completa: prerequisitos, correr el script, verificar, URL para otras PCs, como actualizar, troubleshooting.
+
+### Build verificado
+
+`npm run build` en `web/` compilo sin errores de tipos. Warning de chunk size (521 KB) es esperado — Framer Motion, irrelevante en LAN.
+
+### Estado actual (20 jul 2026)
+
+| Componente | Estado |
+|---|---|
+| Paquete de deploy (`deploy/`) | ✅ Completo — instalar.ps1, .env.example, README |
+| API URL configurable | ✅ Refactorizado en los 9 archivos de paginas |
+| Express sirve frontend en produccion | ✅ express.static + fallback SPA |
+| Scripts de backup sin rutas hardcodeadas | ✅ Todo desde `api/.env` |
+| Las 3 etapas del flujo | ✅ Funcionando de punta a punta |
+
+### Pendientes principales
+
+1. Cuando llegue el disco externo de 2TB: ajustar `BACKUP_DESTINO` en `api/.env` (los scripts lo leen de ahi automaticamente)
+2. Instalar en la PC servidor del lab con `deploy/instalar.ps1`
+3. Cargar clientes reales desde el sistema actual del lab
+4. Confirmaciones del lab: valores predeterminados, tipo presencia, formatos especiales (01, 121)
+
+*Actualizado por Claude Code el 20/07/2026.*

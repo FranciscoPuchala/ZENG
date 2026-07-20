@@ -1,4 +1,5 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { createPortal } from "react-dom"
 import { Printer, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -26,8 +27,6 @@ interface ReporteData {
   analisis: Analisis[]
   metodologias: Metodologia[]
 }
-
-const API = "http://localhost:3001"
 
 // ── Helpers de formato ───────────────────────────────────────────────
 function ddmmaa(iso: string | null) {

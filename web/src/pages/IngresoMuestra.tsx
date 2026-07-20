@@ -1,4 +1,5 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { X, Search, Check, Trash2 } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
@@ -25,8 +26,6 @@ interface Muestra  {
   fecha_entrada: string; cliente_nombre: string; numero_cliente: string
   ensayo_codigos: string[]; estado: string
 }
-
-const API = "http://localhost:3001"
 
 const ESTADO_LABEL: Record<string, string> = {
   pendiente: "Pendiente", cargado: "Cargado", publicado: "Publicado",

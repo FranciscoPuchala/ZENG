@@ -1,9 +1,8 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import { ShieldCheck, ShieldAlert, Clock, RefreshCw, AlertTriangle, RotateCcw } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { leerToken } from "@/lib/auth"
-
-const API = "http://localhost:3001"
 
 interface Entrada {
   fecha: string

@@ -1,4 +1,5 @@
 import * as React from "react"
+import { API } from "@/lib/api"
 import {
   Search, ChevronRight, Save, FlaskConical, X, Printer,
   FileText, ChevronDown, ChevronUp,
@@ -34,8 +35,6 @@ interface Parametro {
 }
 interface Metodologia { codigo: string; descripcion: string }
 interface Usuario { id: number; iniciales: string; nombre: string }
-
-const API = "http://localhost:3001"
 
 function hoyISO() { return new Date().toISOString().slice(0, 10) }
 function horaAhoraISO() {
