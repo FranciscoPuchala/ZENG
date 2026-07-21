@@ -944,3 +944,281 @@ Script PowerShell para instalar todo en la PC servidor (Administrador). Hace en 
 4. Confirmaciones del lab: valores predeterminados, tipo presencia, formatos especiales (01, 121)
 
 *Actualizado por Claude Code el 20/07/2026.*
+
+---
+
+## Sesion — 20 jul 2026 (tarde/noche) — PREDETERMINADOS + FONDO GALACTICO
+
+### Resumen ejecutivo
+
+Cuatro mejoras sobre el sistema completo: corrección de un bug crítico del backend, carga de los 431 clientes reales, sistema de valores predeterminados en los parámetros, y pantalla de login con fondo galáctico interactivo.
+
+---
+
+### Bug corregido — backend no arrancaba ✅
+
+**Causa:** `app.get("*", ...)` en `api/index.js` — path-to-regexp v8 ya no acepta el wildcard `*` como nombre de parámetro.
+
+**Fix:** reemplazado por `app.use((_req, res) => res.sendFile(...))` — evita el parser de rutas por completo. El fallback SPA sigue funcionando igual.
+
+---
+
+### 431 clientes reales cargados ✅
+
+Nuevo archivo: `db/seed_clientes.sql`
+
+- 431 clientes extraídos de las capturas de pantalla del sistema Access (relevamiento 20/07/2026)
+- Códigos en todos los formatos usados por el lab: `'026 A'`, `'003'`, `'150A'`, `'D 26'`, `'3296'`, etc.
+- `ON CONFLICT (numero_cliente) DO UPDATE SET nombre = EXCLUDED.nombre` — idempotente, se puede volver a correr sin duplicar.
+- Resultado al correr: `INSERT 0 431`
+
+---
+
+### Sistema de valores predeterminados en parámetros ✅
+
+#### Por qué
+
+El 95% de los resultados de muchos parámetros es siempre el mismo valor (ej. `<1.0*10(1)`, `Ausencia`, `Negativo`). En vez de que el analista escriba el mismo valor una y otra vez, la app lo pre-carga y el analista solo lo cambia si el resultado es diferente.
+
+#### Migración de base de datos — `db/migracion_parametros_defaults.sql` (nuevo)
+
+```sql
+ALTER TABLE parametros
+  ADD COLUMN IF NOT EXISTS valor_predeterminado VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS valor_referencia     VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS tipo_campo           VARCHAR(30) NOT NULL DEFAULT 'texto';
+```
+
+Los 4 valores posibles de `tipo_campo`:
+- `'texto'` — campo libre (el analista escribe)
+- `'ausencia'` — botones `Ausencia` / `No Detectado`
+- `'negativo'` — botones `Negativo` / `Presuntivo Positivo`
+- `'no_detectado'` — botones `No Detectado` / `Detectado`
+
+#### Seed de parámetros — `db/seed_parametros.sql` (nuevo)
+
+- 149 parámetros (códigos 0001–0158 + código 50) con `tipo_campo`, `valor_predeterminado`, `valor_referencia`
+- 4 descripciones reales confirmadas (del informe de Potabilidad): 0001, 0002, 0003, 0004
+- El resto tiene descripciones placeholder `'Parámetro 00XX'` — a actualizar en la 2ª visita
+- El `ON CONFLICT` NO sobreescribe `descripcion` — solo actualiza los 3 campos nuevos
+- Resultado al correr: `INSERT 0 149`
+
+Los parámetros con "Aceptable" en el sistema viejo tienen `tipo_campo = 'texto'` y `valor_predeterminado = NULL` — el analista tiene que escribir el valor (no tiene un valor típico fijo).
+
+---
+
+### Carga de Resultados — predeterminados y selectores de botones ✅
+
+`web/src/pages/CargaResultados.tsx` actualizado:
+
+**Valores predeterminados:**
+- Al seleccionar un análisis, cada parámetro se inicializa con su `valor_predeterminado` (si existe)
+- Interface `Parametro` ampliada: `tipo_campo`, `valor_predeterminado`
+
+**Selectores de botones (reemplazó los dropdowns):**
+- Parámetros con `tipo_campo != 'texto'` muestran dos botones lado a lado en lugar de un campo de texto
+- El botón seleccionado se resalta en verde claro (`border-green-400 bg-green-100 text-green-800`)
+- El otro botón queda en gris neutro con hover suave
+- Tabla ampliada de `w-52` a `w-64` para que "Presuntivo Positivo" entre sin cortar
+
+**API actualizada (`api/index.js`):**
+- `/ensayos/:id/parametros` y `/ensayos/:codigo/plantilla` ahora devuelven `p.tipo_campo, p.valor_predeterminado`
+- `/informes/:id/reporte` devuelve `p.valor_referencia`
+
+---
+
+### Informe de Ensayo — columna "Valores de Referencia" ✅
+
+`web/src/pages/InformeImpresion.tsx` actualizado:
+
+- Interface `Resultado` ampliada: `valor_referencia: string | null`
+- Tabla de resultados cambiada de 2 a 3 columnas:
+  - Columna 1 (48%): descripción del parámetro
+  - Columna 2 (26%): Resultados
+  - Columna 3 (26%): Valores de Referencia
+- Sub-cabecera de columnas debajo del bloque del N° ANÁLISIS
+- Las celdas de `valor_referencia` muestran `""` (vacío) si el parámetro no tiene referencia — sin guión, para que el informe quede limpio
+
+---
+
+### Pantalla de Login — fondo galáctico interactivo ✅
+
+`web/src/pages/Login.tsx` reescrito con el componente `FondoGalactico`:
+
+**Técnica:** Canvas `requestAnimationFrame` con `dt` calculado desde `performance.now()`.
+
+**230 estrellas en 3 capas de profundidad:**
+- Near (18 estrellas, depth 0.1–0.25): radio 1.5–3.5px, paralaje de hasta 36px, con halo brillante
+- Mid (62 estrellas, depth 0.4–0.6): radio 0.5–1.6px, paralaje ~16px
+- Far (150 estrellas, depth 0.7–0.95): radio 0.15–0.8px, casi sin paralaje
+
+**Paralaje con mouse:**
+- Fórmula: `par = 40 * (1 - depth)` → estrellas cercanas se mueven más
+- Lerp suave: `sm.x += (mouse.x - sm.x) * 0.07` (60fps, lag visual intencional)
+
+**Nebulosas animadas (3 elipses):**
+- Una teal (izquierda), una violeta (derecha arriba), una azul (abajo)
+- Pulso de opacidad: `0.65 + 0.35 * sin(t * 0.25 + i * 2.1)`
+- Dibujadas con `ctx.save() + ctx.scale(rw*W, rh*H) + createRadialGradient(0,0,0,0,0,1)`
+
+**Estrellas fugaces:**
+- Aparecen cada 3–8s aleatoriamente
+- Trayectoria diagonal, trail con `createLinearGradient`, `life -= dt * 1.6`
+- Cabeza brillante (círculo blanco 2px)
+
+**Tarjeta de login:** glassmorphism — `background: rgba(3,8,26,0.70)` + `backdropFilter: blur(20px)`
+
+---
+
+### Estado actual del proyecto (20 jul 2026, noche)
+
+| Componente | Estado |
+|---|---|
+| Paquete de deploy (`deploy/`) | ✅ Completo |
+| 431 clientes reales | ✅ Cargados en la base |
+| Valores predeterminados en parámetros | ✅ 149 parámetros con tipo_campo + predeterminado + referencia |
+| CargaResultados con predeterminados y botones | ✅ Funciona |
+| Informe con columna Valores de Referencia | ✅ Funciona |
+| Pantalla Login con fondo galáctico | ✅ Interactivo (paralaje + fugaces + nebulosas) |
+
+### Pendientes principales
+
+1. Descriptions de los 145 parámetros placeholder — se rellenan después de la 2ª visita al lab
+2. Instalar en la PC servidor del lab con `deploy/instalar.ps1`
+3. Cuando llegue el disco externo de 2TB: ajustar `BACKUP_DESTINO` en `api/.env`
+4. Confirmaciones del lab: formatos especiales de informe (códigos 01 y 121), header/footer multi-página
+
+*Actualizado por Claude Code el 20/07/2026.*
+
+---
+
+## Sesión — 21 jul 2026 — CORRECCIÓN DE 19 BUGS (backend + frontend)
+
+### Resumen ejecutivo
+
+Sesión de corrección masiva de bugs encontrados por un análisis exhaustivo del código. Se reescribió `api/index.js` completo y se corrigieron 8 archivos del frontend. El build TypeScript pasa sin errores. **Ningún cambio de comportamiento visible en uso normal — todos los fixes son de robustez y seguridad.**
+
+---
+
+### Backend — `api/index.js` reescrito completo ✅
+
+**Helpers nuevos:**
+
+| Helper | Qué hace |
+|---|---|
+| `wrap(fn)` | Captura errores async y responde 500 — evita que el proceso crashee o cuelgue |
+| `spawnAsync(cmd, args, opts)` | Ejecuta procesos externos sin bloquear el event loop (reemplaza `spawnSync`) |
+| `validarRutaBackup(base, carpeta, archivo)` | Previene path traversal — valida que el archivo quede dentro del directorio permitido |
+
+**Fixes aplicados:**
+
+1. **JWT_SECRET validation al arrancar** — si no está en `.env`, el servidor imprime el error y sale (`process.exit(1)`) en vez de arrancar sin funcionar.
+2. **`wrap()` en todos los endpoints** — antes: un throw crasheaba Node o dejaba la request colgada. Ahora: siempre responde 500 JSON.
+3. **`auth` middleware en todos los endpoints de datos** — antes: los endpoints no verificaban el JWT. Ahora: sin token válido → 401.
+4. **Bcrypt null guard en `/login`** — si el usuario no tiene `password_hash` (NULL), responde 401 en vez de crashear.
+5. **Transacción + advisory lock en `POST /muestras`** — `pg_advisory_xact_lock(42)` serializa el `MAX(numero_interno) + 1`. Antes: dos peticiones simultáneas podían generar el mismo número.
+6. **Transacción en `POST /informes`** — antes: si fallaba al actualizar un análisis, el informe quedaba creado pero los análisis seguían como `cargado`. Ahora: todo o nada.
+7. **Fix query de estado de muestra** — antes: `ORDER BY id LIMIT 1` podía devolver `publicado` aunque hubiera análisis pendientes. Ahora: `ORDER BY CASE estado WHEN 'pendiente' THEN 1 ...`.
+8. **N+1 eliminado en `GET /informes/:id/reporte`** — antes: una query por análisis para traer sus resultados. Ahora: una sola query con `json_agg(json_build_object(...)) FILTER (WHERE r.id IS NOT NULL)`.
+9. **`spawnSync` → `spawnAsync`** en todos los endpoints de backup — antes: bloqueaba el event loop hasta 120s.
+10. **`pgBin` desde `process.env.PG_BIN`** — antes: hardcodeado a `C:\Program Files\PostgreSQL\18\bin`.
+11. **Path traversal en backup** — `validarRutaBackup()` valida que `carpeta` sea `frecuentes` o `diarios` y que el path resuelto quede dentro del directorio base.
+
+---
+
+### Base de datos — `db/migracion_unique_informe.sql` (nuevo) ✅
+
+```sql
+ALTER TABLE informes
+  ADD CONSTRAINT informes_numero_informe_unique UNIQUE (numero_informe);
+```
+
+**Antes de aplicar:** verificar que no haya duplicados:
+```sql
+SELECT numero_informe, COUNT(*) FROM informes GROUP BY numero_informe HAVING COUNT(*) > 1;
+```
+
+---
+
+### Frontend — `web/src/lib/auth.ts` ✅
+
+**Fix:** `leerSesion()` — el bloque `catch` ahora llama `borrarToken()`. Antes: si el token estaba malformado, la sesión parecía inválida pero el token corrupto seguía en `sessionStorage`.
+
+---
+
+### Frontend — `web/src/lib/api.ts` ✅
+
+**Nuevo:** función `apiFetch(path, options?)` — agrega el header `Authorization: Bearer <token>` automáticamente en todas las llamadas a la API. Reemplaza los ~30 `fetch(${API}/...)` dispersos en las páginas.
+
+---
+
+### Frontend — 7 páginas corregidas ✅
+
+| Archivo | Fixes |
+|---|---|
+| `IngresoMuestra.tsx` | try/catch en `cargar()`, check `res.ok` en `guardarMuestra()` (antes mostraba éxito aunque fallara), apiFetch |
+| `CargaResultados.tsx` | try/catch en `cargar()`, `AbortController` en `seleccionar()` (cancela fetch anterior si usuario cambia rápido), error cuando `!res.ok` en `guardar()`, apiFetch |
+| `CuadernoAnalisis.tsx` | Fix doble publicación — análisis se sacan de `cargados` inmediatamente al publicar; apiFetch |
+| `InformeImpresion.tsx` | apiFetch |
+| `Panel.tsx` | apiFetch, fix `key={i}` → `key={inf.numero_informe}` |
+| `Respaldo.tsx` | apiFetch reemplaza headers manuales, fix `key={i}` → `key={e.fecha + e.detalle}` |
+| `Clientes.tsx` | try/catch en `verCliente()` (antes: spinner infinito si fallaba), apiFetch |
+
+---
+
+### Estado actual del proyecto (21 jul 2026)
+
+| Componente | Estado |
+|---|---|
+| Backend — robustez y seguridad | ✅ wrap() + auth + transacciones + advisory lock + spawnAsync |
+| Frontend — auth centralizada | ✅ apiFetch con Authorization header automático |
+| Frontend — manejo de errores | ✅ try/catch + res.ok en todas las páginas |
+| DB — constraint UNIQUE en numero_informe | ✅ Script listo — HAY QUE APLICARLO |
+| Las 3 etapas del flujo | ✅ Sin cambio de comportamiento en uso normal |
+
+### Para hacer en la base de datos (aplicar manualmente)
+
+```powershell
+$env:Path = $env:Path + ";C:\Program Files\PostgreSQL\18\bin"
+psql -U postgres -d zeng -f db/migracion_unique_informe.sql
+```
+
+*Actualizado por Claude Code el 21/07/2026.*
+
+---
+
+## Sesión — 21 jul 2026 (continuación) — CHECKLIST DE PERSONALIZACIÓN
+
+### Resumen
+
+Se creó `docs/PERSONALIZAR_NUEVO_LAB.md` — checklist completo de todo lo específico de ZENG que hay que cambiar para instalar el sistema en otro laboratorio. Se generó escaneando el código completo.
+
+### Lo que cubre
+
+12 secciones:
+
+1. **Logo** — reemplazar `web/public/logo.png` (un solo archivo, se propaga solo)
+2. **Nombre en la UI** — 4 archivos: `index.html`, `AppShell.tsx`, `Login.tsx`, `Panel.tsx`
+3. **Informe de Ensayo** — toda la sección de datos del lab en `InformeImpresion.tsx`: LE 006, MGAP N° 0018, dirección, Telefax, emails, web, firma
+4. **Nombre de la base de datos** — `zeng` en 6 archivos (opcional cambiarlo)
+5. **Rutas de backup** — carpetas `backups_zeng/` en scripts y `.env`
+6. **Tareas programadas de Windows** — `ZENG_Backend`, `ZENG_Backup_Frecuente`, `ZENG_Backup_Diario`
+7. **Credenciales** — `JWT_SECRET` y `DB_PASSWORD` siempre nuevos; el instalador los genera automáticamente
+8. **Usuario admin** — cosmético en `crear_admin.js`
+9. **sessionStorage key** — `"zeng_token"` en `auth.ts` (solo importa si hay dos labs en una misma PC)
+10. **Nombre npm** — `"zeng-web"` en `package.json` (cosmético)
+11. **Catálogo** — los 431 clientes y los seeds de ensayos/parámetros/metodologías son de ZENG y NO se copian
+12. **Mensaje de consola** — cosmético en `api/index.js`
+
+### Checklist rápido (orden de trabajo)
+
+1. Reemplazar `logo.png`
+2. Editar `deploy/instalar.ps1` antes de correrlo
+3. Correr `instalar.ps1` (genera credenciales nuevas automáticamente)
+4. Editar `InformeImpresion.tsx` (datos del lab en el informe)
+5. Editar los 4 textos de marca
+6. Cargar catálogo del nuevo lab
+7. Cargar clientes del nuevo lab
+8. `npm run build`
+
+*Actualizado por Claude Code el 21/07/2026.*

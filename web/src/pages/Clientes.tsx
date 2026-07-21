@@ -1,5 +1,5 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { Search, Users, ChevronRight, Printer } from "lucide-react"
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent,
@@ -64,9 +64,10 @@ export function Clientes() {
   const [informeId, setInformeId]         = React.useState<number | null>(null)
 
   React.useEffect(() => {
-    fetch(`${API}/clientes`)
-      .then(r => r.json())
+    apiFetch('/clientes')
+      .then(r => r.ok ? r.json() : [])
       .then(setClientes)
+      .catch(() => {})
   }, [])
 
   async function verCliente(c: Cliente) {
@@ -74,10 +75,15 @@ export function Clientes() {
     setAnalisis([])
     setBusqAnalisis("")
     setCargandoAn(true)
-    const res = await fetch(`${API}/clientes/${c.id}/analisis`)
-    const data = await res.json()
-    setAnalisis(data)
-    setCargandoAn(false)
+    try {
+      const res = await apiFetch(`/clientes/${c.id}/analisis`)
+      const data = res.ok ? await res.json() : []
+      setAnalisis(data)
+    } catch {
+      setAnalisis([])
+    } finally {
+      setCargandoAn(false)
+    }
   }
 
   // Filtro de clientes

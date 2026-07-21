@@ -1,5 +1,5 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { X, Search, Check, Trash2 } from "lucide-react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
@@ -66,22 +66,27 @@ export function IngresoMuestra() {
   // --- Cargar datos al abrir la pantalla ---
   React.useEffect(() => {
     async function cargar() {
-      const [cliRes, usuRes, ensRes, muRes] = await Promise.all([
-        fetch(`${API}/clientes`),
-        fetch(`${API}/usuarios`),
-        fetch(`${API}/ensayos`),
-        fetch(`${API}/muestras`),
-      ])
-      const cli = await cliRes.json()
-      const usu = await usuRes.json()
-      const ens = await ensRes.json()
-      const mu  = await muRes.json()
-      setClientes(cli)
-      setUsuarios(usu)
-      setEnsayos(ens)
-      setMuestras(mu)
-      if (usu.length > 0) setRecibidoPor(String(usu[0].id))
-      setCargando(false)
+      try {
+        const [cliRes, usuRes, ensRes, muRes] = await Promise.all([
+          apiFetch('/clientes'),
+          apiFetch('/usuarios'),
+          apiFetch('/ensayos'),
+          apiFetch('/muestras'),
+        ])
+        const cli = await cliRes.json()
+        const usu = await usuRes.json()
+        const ens = await ensRes.json()
+        const mu  = await muRes.json()
+        setClientes(cli)
+        setUsuarios(usu)
+        setEnsayos(ens)
+        setMuestras(mu)
+        if (usu.length > 0) setRecibidoPor(String(usu[0].id))
+      } catch {
+        // falla silenciosamente; las listas quedan vacías
+      } finally {
+        setCargando(false)
+      }
     }
     cargar()
   }, [])
@@ -112,7 +117,7 @@ export function IngresoMuestra() {
     setGuardando(true)
     try {
       for (const desc of descripciones) {
-        await fetch(`${API}/muestras`, {
+        const res = await apiFetch('/muestras', {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -126,12 +131,21 @@ export function IngresoMuestra() {
             ensayo_ids:     ensayosSelec,
           }),
         })
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}))
+          setToastMsg((data as { error?: string }).error ?? "Error al guardar la muestra")
+          setToastVisible(true)
+          return
+        }
       }
-      const mu = await fetch(`${API}/muestras`)
+      const mu = await apiFetch('/muestras')
       setMuestras(await mu.json())
       const n = descripciones.length
       setToastMsg(n === 1 ? "Muestra guardada correctamente" : `${n} muestras guardadas correctamente`)
       limpiarForm()
+      setToastVisible(true)
+    } catch {
+      setToastMsg("Error de conexión con el servidor")
       setToastVisible(true)
     } finally {
       setGuardando(false)
@@ -139,7 +153,7 @@ export function IngresoMuestra() {
   }
 
   async function borrarMuestra(id: number) {
-    const res = await fetch(`${API}/muestras/${id}`, { method: "DELETE" })
+    const res = await apiFetch(`/muestras/${id}`, { method: "DELETE" })
     if (res.ok) {
       setMuestras(prev => prev.filter(m => m.id !== id))
     } else {

@@ -1,8 +1,7 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { ShieldCheck, ShieldAlert, Clock, RefreshCw, AlertTriangle, RotateCcw } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { leerToken } from "@/lib/auth"
 
 interface Entrada {
   fecha: string
@@ -91,7 +90,7 @@ export function Respaldo() {
     setTextoConfirmar("")
     setCargandoLista(true)
     try {
-      const res  = await fetch(`${API}/backup/lista`, { headers: { Authorization: `Bearer ${leerToken()}` } })
+      const res  = await apiFetch('/backup/lista')
       const data = await res.json()
       setBackups(data.backups ?? [])
     } catch {
@@ -107,9 +106,9 @@ export function Respaldo() {
     setTextoConfirmar("")
     setCargandoPreview(true)
     try {
-      const res  = await fetch(`${API}/backup/preview`, {
+      const res  = await apiFetch('/backup/preview', {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${leerToken()}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archivo: backup.archivo, carpeta: backup.carpeta }),
       })
       const data = await res.json()
@@ -125,9 +124,9 @@ export function Respaldo() {
     if (!seleccionado) return
     setRestaurando(true)
     try {
-      const res  = await fetch(`${API}/backup/restaurar`, {
+      const res  = await apiFetch('/backup/restaurar', {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${leerToken()}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ archivo: seleccionado.archivo, carpeta: seleccionado.carpeta }),
       })
       const data = await res.json()
@@ -148,7 +147,7 @@ export function Respaldo() {
   async function cargar() {
     setCargando(true)
     try {
-      const res  = await fetch(`${API}/backup/status`, { headers: { Authorization: `Bearer ${leerToken()}` } })
+      const res  = await apiFetch('/backup/status')
       const data = await res.json()
       if (data.sin_log) { setSinLog(true); setEntradas([]) }
       else              { setSinLog(false); setEntradas(data.entradas ?? []) }
@@ -305,8 +304,8 @@ export function Respaldo() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {entradas.map((e, i) => (
-                    <tr key={i} className="hover:bg-muted/20">
+                  {entradas.map((e) => (
+                    <tr key={e.fecha + e.detalle} className="hover:bg-muted/20">
                       <td className="px-5 py-2.5 font-mono text-xs text-muted-foreground">{e.fecha}</td>
                       <td className="px-4 py-2.5">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${

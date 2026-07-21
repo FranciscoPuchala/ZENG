@@ -149,51 +149,30 @@ Modelo **cliente-servidor** con **una sola base compartida**:
 - **De dev a prod:** hoy todo corre en `localhost`. En prod: Postgres + backend en el servidor, y el frontend (`web`) apunta su URL de API a la IP del servidor (variable de entorno). Es cambio de config, no rehacer nada.
 - **Servidor:** una de las 4 PC (la más confiable, siempre prendida) o un equipo dedicado (mini-PC / Raspberry). A definir.
 
-## Tarea actual (jul 2026) — Paquete de instalación del servidor (carpeta `deploy/`), PASO A PASO
+## Tarea actual (jul 2026) — Listado de personalización para vender a OTRO laboratorio
 
-> **IMPORTANTE para Claude Code:** Francisco está aprendiendo. Explicá cada paso simple, de a
-> UNO, esperá que confirme, y enseñá el concepto (qué es un build de producción, un servicio de
-> Windows, el firewall, etc.). Es una tarea grande: hacerla por etapas.
+> **IMPORTANTE para Claude Code:** hoy todo está hecho a medida de ZENG. Francisco necesita, para
+> cuando venda el sistema a otro laboratorio, un **checklist claro de TODO lo específico de ZENG que
+> hay que cambiar**. Crear un README en el repo (ej. `docs/PERSONALIZAR_NUEVO_LAB.md`) con ese
+> listado y subirlo.
 
-**Objetivo:** crear en el repo una carpeta **`deploy/`** con scripts + instructivo para montar
-TODO el sistema en **una sola PC (el servidor)** — la que corre PostgreSQL + backend, siempre
-prendida. Las otras 3 PC **no** llevan nada instalado: solo abren el navegador apuntando a la IP
-del servidor. Meta: instalar el servidor = "correr un script + un par de datos".
-(Ver la sección "Despliegue en producción" de este archivo.)
+**Cómo armarlo:** **escaneá el código** (grep por `zeng`, `ZENG`, `Zeng`, `LE 006`, `MGAP`, la
+dirección/teléfono/emails/web de ZENG, etc.) y listá cada cosa específica del laboratorio, indicando
+**en qué archivo está** y **qué hay que cambiar**. Cubrir al menos:
 
-### Paso 1 — Preparar la app para producción (un solo proceso)
-- Hoy en dev corren separados: frontend (`web`, :5173) y backend (`api`, :3001). En producción,
-  **una sola app:** hacer el **build del frontend** (`cd web && npm run build` → `web/dist`) y que
-  el **backend (Express) sirva ese build** como estáticos, en un solo puerto.
-- El frontend hoy llama a `http://localhost:3001` **hardcodeado** → cambiarlo a **ruta relativa**
-  (mismo origen) o a una variable `VITE_API_URL`, para que en el servidor apunte bien.
+1. **Marca / identidad:** el nombre "ZENG", el logo (`web/public/logo.png`), el favicon, y los textos
+   de marca (intro, títulos).
+2. **Datos del lab en el Informe de Ensayo:** nombre, dirección, teléfono, fax, emails, web, N° de
+   acreditación (O.U.A. **LE 006**), Reg. MGAP Nº 0018 — todo lo que hoy dice ZENG en el informe.
+3. **Secretos y credenciales (nuevos por cada lab):** `JWT_SECRET`, contraseña de Postgres,
+   usuarios/admin. `instalar.ps1` ya los genera nuevos, pero dejarlo explícito en el listado.
+4. **Datos propios del lab:** los **clientes** (los 431 cargados son de ZENG) y el **catálogo**
+   (ensayos, parámetros, metodologías, formatos de informe) — otro lab puede tener los suyos.
+   Explicar qué se recarga y cómo.
+5. **Constantes / hardcode** con "zeng" (incluido el nombre de la base `zeng` si conviene
+   parametrizarlo) o rutas específicas.
 
-### Paso 2 — Script de instalación (PowerShell, en `deploy/`)
-Que en la PC servidor haga:
-1. Verifica que estén **PostgreSQL** y **Node** (o guía para instalarlos).
-2. Crea la base `zeng` y corre en orden: `db/zeng_esquema_v1.sql`, `db/migracion_v2.sql`,
-   `db/migracion_login.sql`, y los seeds (catálogos + `api/crear_admin.js` para el primer admin).
-3. Instala deps del backend (`cd api && npm install`) y genera el `.env` desde una plantilla
-   (pide la contraseña de Postgres y genera el `JWT_SECRET`).
-4. Build del frontend y backend sirviéndolo.
-5. Deja el **backend en auto-arranque** (servicio de Windows con NSSM, o pm2 + pm2-startup, o
-   tarea "al iniciar"). PostgreSQL ya arranca solo como servicio.
-6. Configura el **firewall de Windows** para permitir el puerto del servidor en la LAN, y muestra
-   la **IP del servidor** (las otras PC entran por `http://IP:puerto`).
+Para cada punto: **archivo (y línea si aplica) + qué reemplazar.** El objetivo es que personalizar
+para un lab nuevo sea **seguir una lista**, no cazar cosas por el código.
 
-### Paso 3 — Backups (parte del servidor)
-- Instalar el backup automático decidido: `pg_dump` de `zeng` **cada 30 min** (horario de trabajo)
-  al **disco externo de 2 TB** + **1 diario**, con rotación (frecuentes ~7 días, diarios ~1 año),
-  **log** de OK/ERROR, y programado con el **Programador de tareas**. Script(s) en `deploy/` o
-  `scripts/`. **Probar una restauración** para confirmar que sirve.
-
-### Paso 4 — `.env.example` + README de instalación
-- `deploy/.env.example` con todas las variables (DB_*, JWT_SECRET, PUERTO, carpeta de backups).
-- `deploy/README.md` paso a paso: prerequisitos, correr el script, cómo verificar que anda, cómo
-  entran las otras PC, cómo **actualizar** (git pull + rebuild + reiniciar el backend) y qué hacer
-  si algo falla (apoyarse en `docs/GUIA_BASE_DE_DATOS.md`).
-
-**Nota:** esto es **preparar el paquete**. NO poner en producción real hasta cerrar el Informe de
-Ensayo (faltan las confirmaciones del lab).
-
-Al terminar la sesión, actualizá `PARA_COWORK.md`.
+Al terminar, actualizá `PARA_COWORK.md`.

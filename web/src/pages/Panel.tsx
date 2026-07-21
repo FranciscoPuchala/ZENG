@@ -1,5 +1,5 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { ClipboardList, FlaskConical, FileCheck2, CalendarCheck } from "lucide-react"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 
@@ -143,10 +143,10 @@ export function Panel() {
   const [hora, setHora]   = React.useState(new Date())
 
   React.useEffect(() => {
-    fetch(`${API}/stats/panel`)
-      .then(r => r.json())
-      .then(setStats)
-      .catch(() => {}) // falla en silencio si la API no está lista
+    apiFetch('/stats/panel')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setStats(d) })
+      .catch(() => {})
   }, [])
 
   // Reloj en tiempo real
@@ -244,8 +244,8 @@ export function Panel() {
               <p className="px-5 py-4 text-center text-sm text-muted-foreground">
                 Sin informes todavía.
               </p>
-            ) : stats.ultimos_informes.map((inf, i) => (
-              <div key={i} className="flex flex-col gap-0.5 px-5 py-3">
+            ) : stats.ultimos_informes.map((inf) => (
+              <div key={inf.numero_informe} className="flex flex-col gap-0.5 px-5 py-3">
                 <span className="font-mono text-xs font-semibold text-teal-700">
                   {inf.numero_informe}
                 </span>

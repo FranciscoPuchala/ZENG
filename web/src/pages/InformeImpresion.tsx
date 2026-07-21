@@ -1,5 +1,5 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { createPortal } from "react-dom"
 import { Printer, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,6 +15,7 @@ interface Informe {
 interface Resultado {
   descripcion: string; unidad: string | null
   valor: string | null; lectura_dilucion: string | null
+  valor_referencia: string | null
 }
 interface Analisis {
   id: number; numero_interno: number; numero_cliente_secuencial: number
@@ -57,13 +58,13 @@ export function InformeImpresion({
   const [error, setError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
-    fetch(`${API}/informes/${informeId}/reporte`)
+    apiFetch(`/informes/${informeId}/reporte`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
       })
       .then(d => { setData(d); setCargando(false) })
-      .catch(e => { setError(e.message); setCargando(false) })
+      .catch((e: Error) => { setError(e.message); setCargando(false) })
   }, [informeId])
 
   // Crear el nodo del portal una sola vez
@@ -180,17 +181,33 @@ function InformeLayout({
 
         {/* ── Bloques por análisis ─────────────────────── */}
         {analisis.map(a => (
-          <table key={a.id} style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt", marginBottom: 6 }}>
+          <table key={a.id} style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt", marginBottom: 6, tableLayout: "fixed" }}>
+            <colgroup>
+              <col style={{ width: "48%" }} />
+              <col style={{ width: "26%" }} />
+              <col style={{ width: "26%" }} />
+            </colgroup>
             <tbody>
               {/* Cabecera del análisis */}
               <tr>
-                <td style={{ width: "42%", border: "1px solid black", borderRight: "none", padding: "4px 7px", fontWeight: 700, verticalAlign: "top" }}>
+                <td style={{ border: "1px solid black", borderRight: "none", padding: "4px 7px", fontWeight: 700, verticalAlign: "top" }}>
                   N° de ANÁLISIS{"  "}
                   {nroAnalisis(informe.numero_cliente, a.numero_cliente_secuencial, a.fecha_siembra)}
                 </td>
-                <td style={{ border: "1px solid black", padding: "4px 7px", verticalAlign: "top" }}>
+                <td colSpan={2} style={{ border: "1px solid black", padding: "4px 7px", verticalAlign: "top" }}>
                   <div style={{ fontWeight: 700 }}>DESCRIPCION DE LA MUESTRA</div>
                   <div>{a.descripcion}</div>
+                </td>
+              </tr>
+
+              {/* Sub-cabecera de columnas */}
+              <tr>
+                <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px" }}></td>
+                <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px", fontWeight: 700, textAlign: "center" }}>
+                  Resultados
+                </td>
+                <td style={{ border: "1px solid black", borderTop: "none", padding: "3px 7px", fontWeight: 700, textAlign: "center" }}>
+                  Valores de Referencia
                 </td>
               </tr>
 
@@ -200,8 +217,11 @@ function InformeLayout({
                   <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px" }}>
                     {r.descripcion}{r.unidad ? ` (${r.unidad})` : ""}
                   </td>
-                  <td style={{ border: "1px solid black", borderTop: "none", padding: "3px 7px" }}>
+                  <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px", textAlign: "center" }}>
                     {r.valor ?? "—"}
+                  </td>
+                  <td style={{ border: "1px solid black", borderTop: "none", padding: "3px 7px", textAlign: "center" }}>
+                    {r.valor_referencia ?? ""}
                   </td>
                 </tr>
               ))}

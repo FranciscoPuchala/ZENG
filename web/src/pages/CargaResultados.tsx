@@ -1,5 +1,5 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import {
   Search, ChevronRight, Save, FlaskConical, X, Printer,
   FileText, ChevronDown, ChevronUp,
@@ -31,7 +31,10 @@ interface Analisis {
 }
 interface Parametro {
   id: number; codigo: string; descripcion: string
-  unidad: string | null; tipo_valor: "numerico" | "presencia"; orden: number
+  unidad: string | null
+  tipo_campo: "texto" | "ausencia" | "negativo" | "no_detectado"
+  valor_predeterminado: string | null
+  orden: number
 }
 interface Metodologia { codigo: string; descripcion: string }
 interface Usuario { id: number; iniciales: string; nombre: string }
@@ -42,23 +45,28 @@ function horaAhoraISO() {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }
 
-// ── Selector -/+ para parámetros de presencia ────────────────────────
-function SelectorPresencia({
-  value, onChange,
-}: { value: string; onChange: (v: string) => void }) {
+const OPCIONES_CAMPO: Record<string, string[]> = {
+  ausencia:     ["Ausencia", "No Detectado"],
+  negativo:     ["Negativo", "Presuntivo Positivo"],
+  no_detectado: ["No Detectado", "Detectado"],
+}
+
+function SelectorBoton({
+  opciones,
+  value,
+  onChange,
+}: { opciones: string[]; value: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-1">
-      {(["-", "+"] as const).map(op => (
+      {opciones.map(op => (
         <button
           key={op}
           type="button"
-          onClick={() => onChange(value === op ? "" : op)}
+          onClick={() => onChange(op)}
           className={[
-            "flex h-8 w-10 items-center justify-center rounded-md border text-sm font-semibold transition-colors",
-            value === op && op === "-"
-              ? "border-red-300 bg-red-50 text-red-700"
-              : value === op && op === "+"
-              ? "border-teal-400 bg-teal-50 text-teal-700"
+            "flex h-8 flex-1 items-center justify-center rounded-md border px-1.5 text-[11px] font-medium transition-colors",
+            value === op
+              ? "border-green-400 bg-green-100 text-green-800"
               : "border-border bg-card text-muted-foreground hover:bg-muted",
           ].join(" ")}
         >
@@ -98,19 +106,27 @@ export function CargaResultados() {
   const [fichaVisible,    setFichaVisible]    = React.useState(false)
   const [fichaParametros, setFichaParametros] = React.useState<FichaParametro[]>([])
 
+  // AbortController para cancelar fetch de plantilla cuando el usuario cambia de análisis
+  const abortRef = React.useRef<AbortController | null>(null)
+
   // Cargar pendientes y usuarios al abrir
   React.useEffect(() => {
     async function cargar() {
-      const [penRes, usuRes] = await Promise.all([
-        fetch(`${API}/analisis/pendientes`),
-        fetch(`${API}/usuarios`),
-      ])
-      const pen = await penRes.json()
-      const usu = await usuRes.json()
-      setPendientes(pen)
-      setUsuarios(usu)
-      if (usu.length > 0) setAnalistaId(String(usu[0].id))
-      setCargando(false)
+      try {
+        const [penRes, usuRes] = await Promise.all([
+          apiFetch('/analisis/pendientes'),
+          apiFetch('/usuarios'),
+        ])
+        const pen = await penRes.json()
+        const usu = await usuRes.json()
+        setPendientes(pen)
+        setUsuarios(usu)
+        if (usu.length > 0) setAnalistaId(String(usu[0].id))
+      } catch {
+        // falla silenciosamente
+      } finally {
+        setCargando(false)
+      }
     }
     cargar()
   }, [])
@@ -155,25 +171,38 @@ export function CargaResultados() {
 
   async function imprimirFicha() {
     if (!fichaEnsayo || fichaIds.length === 0) return
-    const res = await fetch(`${API}/ensayos/${fichaEnsayo}/plantilla`)
-    const data = await res.json()
-    setFichaParametros(data.parametros)
-    setFichaVisible(true)
+    try {
+      const res = await apiFetch(`/ensayos/${fichaEnsayo}/plantilla`)
+      if (!res.ok) return
+      const data = await res.json()
+      setFichaParametros(data.parametros)
+      setFichaVisible(true)
+    } catch { /* sin conexión */ }
   }
 
   // Seleccionar un análisis para cargar resultados
   async function seleccionar(a: Analisis) {
+    // Cancela la fetch anterior si el usuario cambia de análisis rápido
+    abortRef.current?.abort()
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
     setSeleccionado(a)
     setParametros([])
     setMetodologias([])
     setValores({})
-    const res  = await fetch(`${API}/ensayos/${a.ensayo_codigo}/plantilla`)
-    const data = await res.json()
-    setParametros(data.parametros)
-    setMetodologias(data.metodologias)
-    const init: Record<number, string> = {}
-    data.parametros.forEach((p: Parametro) => { init[p.id] = "" })
-    setValores(init)
+    try {
+      const res = await apiFetch(`/ensayos/${a.ensayo_codigo}/plantilla`, { signal: ctrl.signal })
+      if (!res.ok) return
+      const data = await res.json()
+      setParametros(data.parametros)
+      setMetodologias(data.metodologias)
+      const init: Record<number, string> = {}
+      data.parametros.forEach((p: Parametro) => { init[p.id] = p.valor_predeterminado ?? "" })
+      setValores(init)
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return
+    }
   }
 
   function eliminarParametro(id: number) {
@@ -190,7 +219,7 @@ export function CargaResultados() {
     setErrorValores([])
     setGuardando(true)
     try {
-      const res = await fetch(`${API}/analisis/${seleccionado.id}/resultados`, {
+      const res = await apiFetch(`/analisis/${seleccionado.id}/resultados`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -212,7 +241,12 @@ export function CargaResultados() {
         setParametros([])
         setMetodologias([])
         setValores({})
+      } else {
+        const data = await res.json().catch(() => ({}))
+        alert((data as { error?: string }).error ?? "Error al guardar los resultados")
       }
+    } catch {
+      alert("Error de conexión con el servidor")
     } finally {
       setGuardando(false)
     }
@@ -508,7 +542,7 @@ export function CargaResultados() {
                         <TableRow>
                           <TableHead>Parámetro</TableHead>
                           <TableHead className="w-20">Cód.</TableHead>
-                          <TableHead className="w-52">Valor</TableHead>
+                          <TableHead className="w-64">Valor</TableHead>
                           <TableHead className="w-10"></TableHead>
                         </TableRow>
                       </TableHeader>
@@ -533,9 +567,10 @@ export function CargaResultados() {
                               {p.codigo}
                             </TableCell>
                             <TableCell>
-                              {p.tipo_valor === "presencia" ? (
-                                <SelectorPresencia
-                                  value={valores[p.id] ?? ""}
+                              {OPCIONES_CAMPO[p.tipo_campo] ? (
+                                <SelectorBoton
+                                  opciones={OPCIONES_CAMPO[p.tipo_campo]}
+                                  value={valores[p.id] ?? p.valor_predeterminado ?? ""}
                                   onChange={v => {
                                     setValores(prev => ({ ...prev, [p.id]: v }))
                                     setErrorValores(prev => prev.filter(id => id !== p.id))
@@ -543,7 +578,7 @@ export function CargaResultados() {
                                 />
                               ) : (
                                 <Input
-                                  placeholder="Ej. <1.0*10(1)"
+                                  placeholder={p.valor_predeterminado ?? ""}
                                   className={["h-8 font-mono text-xs", conError ? "border-red-400 ring-1 ring-red-400" : ""].join(" ")}
                                   value={valores[p.id] ?? ""}
                                   onChange={e => {

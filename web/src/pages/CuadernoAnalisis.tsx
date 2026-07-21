@@ -1,5 +1,5 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { FileCheck2, CheckCircle2, Printer } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Toast } from "@/components/ui/toast"
@@ -64,15 +64,17 @@ export function CuadernoAnalisis() {
   )
 
   function cargarInformes() {
-    fetch(`${API}/informes`)
-      .then(r => r.json())
+    apiFetch('/informes')
+      .then(r => r.ok ? r.json() : [])
       .then(setInformesPublicados)
+      .catch(() => {})
   }
 
   React.useEffect(() => {
-    fetch(`${API}/analisis/cargados`)
-      .then(r => r.json())
+    apiFetch('/analisis/cargados')
+      .then(r => r.ok ? r.json() : [])
       .then(data => { setCargados(data); setCargando(false) })
+      .catch(() => setCargando(false))
     cargarInformes()
   }, [])
 
@@ -112,7 +114,7 @@ export function CuadernoAnalisis() {
     const primero = cargados.find(a => a.id === seleccionados[0])!
     setPublicando(true)
     try {
-      const res = await fetch(`${API}/informes`, {
+      const res = await apiFetch('/informes', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -125,14 +127,22 @@ export function CuadernoAnalisis() {
       })
       if (res.ok) {
         const creado = await res.json()
-        setIdsRecienPublicados(seleccionados)
+        const idsPublicados = seleccionados
+        // Sacar inmediatamente los análisis de la lista — evita doble publicación
+        setCargados(prev => prev.filter(a => !idsPublicados.includes(a.id)))
+        setIdsRecienPublicados(idsPublicados)
         setSeleccionados([])
         setNumeroInforme("")
         setFechaRecepcion("")
         setFechaEmision(new Date().toISOString().split("T")[0])
         cargarInformes()
         setInformeId(creado.id)
+      } else {
+        const data = await res.json().catch(() => ({}))
+        alert((data as { error?: string }).error ?? "Error al publicar el informe")
       }
+    } catch {
+      alert("Error de conexión con el servidor")
     } finally {
       setPublicando(false)
     }
@@ -380,9 +390,8 @@ export function CuadernoAnalisis() {
           onCerrar={(confirmado) => {
             setInformeId(null)
             if (confirmado && idsRecienPublicados.length > 0) {
-              setCargados(prev => prev.filter(a => !idsRecienPublicados.includes(a.id)))
               setIdsRecienPublicados([])
-              setToastMsg("Informe confirmado. Los análisis fueron archivados.")
+              setToastMsg("Informe publicado correctamente.")
               setToastVisible(true)
             }
           }}

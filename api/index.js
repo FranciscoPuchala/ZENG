@@ -5,14 +5,20 @@ import bcrypt from "bcrypt"
 import jwt from "jsonwebtoken"
 import fs from "fs"
 import path from "path"
-import { spawnSync } from "child_process"
+import { spawn } from "child_process"
 import { fileURLToPath } from "url"
 
-const JWT_SECRET = process.env.JWT_SECRET
+// ── Validación de variables de entorno críticas ───────────────────────
+if (!process.env.JWT_SECRET) {
+  console.error("FATAL: JWT_SECRET no está configurado en api/.env — el servidor no puede arrancar.")
+  process.exit(1)
+}
+
+const JWT_SECRET  = process.env.JWT_SECRET
 const SALT_ROUNDS = 10
 const __dirname   = path.dirname(fileURLToPath(import.meta.url))
 
-// --- Conexión a PostgreSQL ---
+// ── Conexión a PostgreSQL ─────────────────────────────────────────────
 const pool = new pg.Pool({
   host:     process.env.DB_HOST,
   port:     process.env.DB_PORT,
@@ -21,7 +27,7 @@ const pool = new pg.Pool({
   password: process.env.DB_PASSWORD,
 })
 
-// --- Servidor Express ---
+// ── Servidor Express ──────────────────────────────────────────────────
 const app = express()
 app.use(express.json())
 
@@ -33,6 +39,49 @@ app.use((req, res, next) => {
   if (req.method === "OPTIONS") return res.sendStatus(200)
   next()
 })
+
+// ── Helpers ───────────────────────────────────────────────────────────
+
+// Captura errores de handlers async y devuelve 500 en vez de crash/cuelgue
+function wrap(fn) {
+  return async (req, res, next) => {
+    try {
+      await fn(req, res, next)
+    } catch (err) {
+      console.error(err)
+      if (!res.headersSent) res.status(500).json({ error: "Error interno del servidor" })
+    }
+  }
+}
+
+// Ejecuta un proceso externo de forma asíncrona (no bloquea el event loop)
+function spawnAsync(cmd, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const { timeout, ...spawnOpts } = opts
+    const proc = spawn(cmd, args, spawnOpts)
+    let stderr = ""
+    if (proc.stderr) proc.stderr.on("data", d => { stderr += d.toString() })
+    let timer
+    if (timeout) {
+      timer = setTimeout(() => {
+        proc.kill()
+        reject(new Error("Proceso excedió el tiempo límite"))
+      }, timeout)
+    }
+    proc.on("close", code => { clearTimeout(timer); resolve({ status: code, stderr }) })
+    proc.on("error", err => { clearTimeout(timer); reject(err) })
+  })
+}
+
+// Valida que la ruta de un backup esté dentro del directorio permitido (evita path traversal)
+function validarRutaBackup(backupBase, carpeta, archivo) {
+  if (!/^(frecuentes|diarios)$/.test(carpeta)) return null
+  const fullPath = path.join(backupBase, carpeta, archivo)
+  const resolved = path.resolve(fullPath)
+  const base     = path.resolve(backupBase)
+  if (!resolved.startsWith(base + path.sep)) return null
+  return fullPath
+}
 
 // Middleware: verifica el JWT y pone el usuario en req.usuario
 function auth(req, res, next) {
@@ -48,8 +97,7 @@ function auth(req, res, next) {
 
 // ── LOGIN / SESIÓN ────────────────────────────────────────────────────
 
-// POST /login → verifica usuario+contraseña y devuelve un JWT
-app.post("/login", async (req, res) => {
+app.post("/login", wrap(async (req, res) => {
   const { usuario, password } = req.body
   if (!usuario || !password) return res.status(400).json({ error: "Faltan datos" })
 
@@ -58,7 +106,8 @@ app.post("/login", async (req, res) => {
     [usuario]
   )
   const user = result.rows[0]
-  if (!user) return res.status(401).json({ error: "Usuario o contraseña incorrectos" })
+  // Si no existe o no tiene contraseña, misma respuesta (no revelar cuál falló)
+  if (!user || !user.password_hash) return res.status(401).json({ error: "Usuario o contraseña incorrectos" })
 
   const ok = await bcrypt.compare(password, user.password_hash)
   if (!ok) return res.status(401).json({ error: "Usuario o contraseña incorrectos" })
@@ -69,15 +118,13 @@ app.post("/login", async (req, res) => {
     { expiresIn: "12h" }
   )
   res.json({ token, usuario: { id: user.id, usuario: user.usuario, nombre: user.nombre, iniciales: user.iniciales, rol: user.rol } })
-})
+}))
 
-// GET /me → verifica el token y devuelve el usuario actual (para recargar la sesión)
 app.get("/me", auth, (req, res) => {
   res.json(req.usuario)
 })
 
-// POST /usuarios → crea un usuario nuevo (solo admin)
-app.post("/usuarios", auth, async (req, res) => {
+app.post("/usuarios", auth, wrap(async (req, res) => {
   if (req.usuario.rol !== "admin") return res.status(403).json({ error: "Solo el admin puede crear usuarios" })
   const { usuario, password, nombre, iniciales, rol = "analista" } = req.body
   if (!usuario || !password || !iniciales) return res.status(400).json({ error: "Faltan datos obligatorios" })
@@ -87,12 +134,11 @@ app.post("/usuarios", auth, async (req, res) => {
     [usuario, hash, nombre || null, iniciales, rol]
   )
   res.status(201).json(result.rows[0])
-})
+}))
 
-// ── CLIENTES ──────────────────────────────────────────────────────────
+// ── STATS / PANEL ─────────────────────────────────────────────────────
 
-// GET /stats/panel → todos los datos del dashboard en una sola llamada
-app.get("/stats/panel", async (req, res) => {
+app.get("/stats/panel", auth, wrap(async (req, res) => {
   const [pend, carg, publ, clts, topEns, activ, ultInf] = await Promise.all([
     pool.query("SELECT COUNT(*)::int AS n FROM analisis WHERE estado = 'pendiente'"),
     pool.query("SELECT COUNT(*)::int AS n FROM analisis WHERE estado = 'cargado'"),
@@ -130,24 +176,25 @@ app.get("/stats/panel", async (req, res) => {
     actividad_14d:    activ.rows,
     ultimos_informes: ultInf.rows,
   })
-})
+}))
 
-app.get("/clientes", async (req, res) => {
+// ── CLIENTES ──────────────────────────────────────────────────────────
+
+app.get("/clientes", auth, wrap(async (req, res) => {
   const result = await pool.query("SELECT * FROM clientes ORDER BY numero_cliente")
   res.json(result.rows)
-})
+}))
 
-app.post("/clientes", async (req, res) => {
+app.post("/clientes", auth, wrap(async (req, res) => {
   const { numero_cliente, nombre, direccion, telefono } = req.body
   const result = await pool.query(
     "INSERT INTO clientes (numero_cliente, nombre, direccion, telefono) VALUES ($1, $2, $3, $4) RETURNING *",
     [numero_cliente, nombre, direccion, telefono]
   )
   res.status(201).json(result.rows[0])
-})
+}))
 
-// GET /clientes/:id/analisis → historial completo de un cliente
-app.get("/clientes/:id/analisis", async (req, res) => {
+app.get("/clientes/:id/analisis", auth, wrap(async (req, res) => {
   const { id } = req.params
   const result = await pool.query(`
     SELECT
@@ -174,26 +221,25 @@ app.get("/clientes/:id/analisis", async (req, res) => {
     ORDER BY m.numero_interno DESC
   `, [id])
   res.json(result.rows)
-})
+}))
 
 // ── USUARIOS ──────────────────────────────────────────────────────────
 
-app.get("/usuarios", async (req, res) => {
+app.get("/usuarios", auth, wrap(async (req, res) => {
   const result = await pool.query("SELECT * FROM usuarios ORDER BY iniciales")
   res.json(result.rows)
-})
+}))
 
 // ── ENSAYOS ───────────────────────────────────────────────────────────
 
-app.get("/ensayos", async (req, res) => {
+app.get("/ensayos", auth, wrap(async (req, res) => {
   const result = await pool.query("SELECT * FROM ensayos ORDER BY codigo")
   res.json(result.rows)
-})
+}))
 
 // ── MUESTRAS ──────────────────────────────────────────────────────────
 
-// GET /muestras → devuelve muestras con nombre de cliente, ensayos y estado
-app.get("/muestras", async (req, res) => {
+app.get("/muestras", auth, wrap(async (req, res) => {
   const result = await pool.query(`
     SELECT
       m.*,
@@ -206,7 +252,13 @@ app.get("/muestras", async (req, res) => {
         '{}'
       ) AS ensayo_codigos,
       COALESCE(
-        (SELECT estado FROM analisis WHERE muestra_id = m.id ORDER BY id LIMIT 1),
+        (SELECT estado FROM analisis WHERE muestra_id = m.id
+         ORDER BY CASE estado
+           WHEN 'pendiente' THEN 1
+           WHEN 'cargado'   THEN 2
+           WHEN 'publicado' THEN 3
+           ELSE 4 END
+         LIMIT 1),
         'pendiente'
       ) AS estado
     FROM muestras m
@@ -215,70 +267,74 @@ app.get("/muestras", async (req, res) => {
     LIMIT 50
   `)
   res.json(result.rows)
-})
+}))
 
-// POST /muestras → crea muestra + los análisis de cada ensayo seleccionado
-app.post("/muestras", async (req, res) => {
+// POST /muestras → crea muestra + análisis en una sola transacción
+app.post("/muestras", auth, wrap(async (req, res) => {
   const {
     cliente_id, descripcion, fecha_entrada, hora_entrada,
     fecha_muestreo, recibido_por, observaciones, ensayo_ids
   } = req.body
 
-  // Número interno global: el máximo actual + 1
-  const maxResult = await pool.query(
-    "SELECT COALESCE(MAX(numero_interno), 228000) + 1 AS siguiente FROM muestras"
-  )
-  const numero_interno = maxResult.rows[0].siguiente
-
-  // Crear la muestra
-  const muestraResult = await pool.query(
-    `INSERT INTO muestras
-      (numero_interno, cliente_id, descripcion, fecha_entrada, hora_entrada,
-       fecha_muestreo, recibido_por, observaciones)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-    [numero_interno, cliente_id, descripcion, fecha_entrada,
-     hora_entrada || null, fecha_muestreo || null, recibido_por || null, observaciones || null]
-  )
-  const muestra = muestraResult.rows[0]
-
-  // Crear un análisis (en estado "pendiente") por cada ensayo seleccionado
-  if (ensayo_ids && ensayo_ids.length > 0) {
-    for (const ensayo_id of ensayo_ids) {
-      await pool.query(
-        "INSERT INTO analisis (muestra_id, ensayo_id, estado) VALUES ($1, $2, 'pendiente')",
-        [muestra.id, ensayo_id]
-      )
-    }
-  }
-
-  res.status(201).json(muestra)
-})
-
-// DELETE /muestras/:id → borra una muestra y sus análisis (solo si todos están pendientes)
-app.delete("/muestras/:id", async (req, res) => {
-  const { id } = req.params
+  const client = await pool.connect()
   try {
-    const checkRes = await pool.query(
-      `SELECT COUNT(*) FROM analisis WHERE muestra_id = $1 AND estado != 'pendiente'`,
-      [id]
+    await client.query("BEGIN")
+    // Lock de asesoría por transacción: evita race condition en numero_interno
+    await client.query("SELECT pg_advisory_xact_lock(42)")
+
+    const maxResult = await client.query(
+      "SELECT COALESCE(MAX(numero_interno), 228000) + 1 AS siguiente FROM muestras"
     )
-    if (parseInt(checkRes.rows[0].count) > 0) {
-      return res.status(409).json({ error: "No se puede borrar: hay análisis que ya fueron trabajados." })
+    const numero_interno = maxResult.rows[0].siguiente
+
+    const muestraResult = await client.query(
+      `INSERT INTO muestras
+        (numero_interno, cliente_id, descripcion, fecha_entrada, hora_entrada,
+         fecha_muestreo, recibido_por, observaciones)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [numero_interno, cliente_id, descripcion, fecha_entrada,
+       hora_entrada || null, fecha_muestreo || null, recibido_por || null, observaciones || null]
+    )
+    const muestra = muestraResult.rows[0]
+
+    if (ensayo_ids && ensayo_ids.length > 0) {
+      for (const ensayo_id of ensayo_ids) {
+        await client.query(
+          "INSERT INTO analisis (muestra_id, ensayo_id, estado) VALUES ($1, $2, 'pendiente')",
+          [muestra.id, ensayo_id]
+        )
+      }
     }
-    await pool.query(`DELETE FROM resultados WHERE analisis_id IN (SELECT id FROM analisis WHERE muestra_id = $1)`, [id])
-    await pool.query(`DELETE FROM analisis WHERE muestra_id = $1`, [id])
-    await pool.query(`DELETE FROM muestras WHERE id = $1`, [id])
-    res.json({ ok: true })
+
+    await client.query("COMMIT")
+    res.status(201).json(muestra)
   } catch (err) {
-    console.error("DELETE /muestras/:id →", err.message)
-    res.status(500).json({ error: err.message })
+    await client.query("ROLLBACK")
+    throw err
+  } finally {
+    client.release()
   }
-})
+}))
+
+// DELETE /muestras/:id → borra una muestra solo si todos sus análisis están pendientes
+app.delete("/muestras/:id", auth, wrap(async (req, res) => {
+  const { id } = req.params
+  const checkRes = await pool.query(
+    `SELECT COUNT(*) FROM analisis WHERE muestra_id = $1 AND estado != 'pendiente'`,
+    [id]
+  )
+  if (parseInt(checkRes.rows[0].count) > 0) {
+    return res.status(409).json({ error: "No se puede borrar: hay análisis que ya fueron trabajados." })
+  }
+  await pool.query(`DELETE FROM resultados WHERE analisis_id IN (SELECT id FROM analisis WHERE muestra_id = $1)`, [id])
+  await pool.query(`DELETE FROM analisis WHERE muestra_id = $1`, [id])
+  await pool.query(`DELETE FROM muestras WHERE id = $1`, [id])
+  res.json({ ok: true })
+}))
 
 // ── ANÁLISIS ──────────────────────────────────────────────────────────
 
-// GET /analisis/pendientes → análisis en estado 'pendiente' con datos de muestra, cliente y ensayo
-app.get("/analisis/pendientes", async (req, res) => {
+app.get("/analisis/pendientes", auth, wrap(async (req, res) => {
   const result = await pool.query(`
     SELECT
       a.id, a.muestra_id, a.ensayo_id,
@@ -293,13 +349,12 @@ app.get("/analisis/pendientes", async (req, res) => {
     ORDER BY m.numero_interno DESC
   `)
   res.json(result.rows)
-})
+}))
 
-// GET /ensayos/:id/parametros → parámetros de un ensayo (por id numérico)
-// Usado en CargaResultados al seleccionar un análisis pendiente.
-app.get("/ensayos/:id/parametros", async (req, res) => {
+app.get("/ensayos/:id/parametros", auth, wrap(async (req, res) => {
   const result = await pool.query(
-    `SELECT p.id, p.codigo, p.descripcion AS nombre, p.unidad, p.tipo_valor, ep.orden
+    `SELECT p.id, p.codigo, p.descripcion AS nombre, p.unidad, p.tipo_campo,
+            p.valor_predeterminado, p.valor_referencia, ep.orden
      FROM parametros p
      JOIN ensayo_parametros ep ON ep.parametro_id = p.id
      WHERE ep.ensayo_id = $1
@@ -307,26 +362,20 @@ app.get("/ensayos/:id/parametros", async (req, res) => {
     [req.params.id]
   )
   res.json(result.rows)
-})
+}))
 
-// GET /ensayos/:codigo/plantilla → plantilla completa de un ensayo (por código texto)
-// Devuelve { ensayo, parametros[], metodologias[] }.
-// Usado en la futura pantalla de carga donde el analista escribe el código de ensayo.
-app.get("/ensayos/:codigo/plantilla", async (req, res) => {
-  // 1. Buscar el ensayo por código
+app.get("/ensayos/:codigo/plantilla", auth, wrap(async (req, res) => {
   const ensayoRes = await pool.query(
     "SELECT id, codigo, nombre FROM ensayos WHERE codigo = $1",
     [req.params.codigo]
   )
-  if (ensayoRes.rows.length === 0) {
-    return res.status(404).json({ error: "Ensayo no encontrado" })
-  }
+  if (ensayoRes.rows.length === 0) return res.status(404).json({ error: "Ensayo no encontrado" })
   const ensayo = ensayoRes.rows[0]
 
-  // 2. Traer parámetros y metodologías en paralelo (más rápido que uno por uno)
   const [paramRes, metodRes] = await Promise.all([
     pool.query(
-      `SELECT p.id, p.codigo, p.descripcion, p.unidad, p.tipo_valor, ep.orden
+      `SELECT p.id, p.codigo, p.descripcion, p.unidad, p.tipo_campo,
+              p.valor_predeterminado, p.valor_referencia, ep.orden
        FROM parametros p
        JOIN ensayo_parametros ep ON ep.parametro_id = p.id
        WHERE ep.ensayo_id = $1
@@ -343,15 +392,10 @@ app.get("/ensayos/:codigo/plantilla", async (req, res) => {
     ),
   ])
 
-  res.json({
-    ensayo,
-    parametros:   paramRes.rows,
-    metodologias: metodRes.rows,
-  })
-})
+  res.json({ ensayo, parametros: paramRes.rows, metodologias: metodRes.rows })
+}))
 
-// GET /analisis/cargados → análisis en estado 'cargado' listos para agrupar en informe
-app.get("/analisis/cargados", async (req, res) => {
+app.get("/analisis/cargados", auth, wrap(async (req, res) => {
   const result = await pool.query(`
     SELECT
       a.id, a.muestra_id, a.ensayo_id,
@@ -367,41 +411,50 @@ app.get("/analisis/cargados", async (req, res) => {
     ORDER BY m.numero_interno DESC
   `)
   res.json(result.rows)
-})
+}))
 
-// POST /informes → crea un informe y pasa los análisis seleccionados a 'publicado'
-app.post("/informes", async (req, res) => {
+// POST /informes → crea informe y pasa los análisis a 'publicado' en una sola transacción
+app.post("/informes", auth, wrap(async (req, res) => {
   const { cliente_id, numero_informe, fecha_recepcion, fecha_emision, analisis_ids } = req.body
 
-  // Derivar fecha_muestreo (de la muestra) y fecha_analisis (fecha_siembra) automáticamente
-  const datesRes = await pool.query(
-    `SELECT MIN(m.fecha_muestreo) AS fecha_muestreo, MIN(a.fecha_siembra) AS fecha_analisis
-     FROM analisis a JOIN muestras m ON m.id = a.muestra_id WHERE a.id = ANY($1::int[])`,
-    [analisis_ids]
-  )
-  const { fecha_muestreo, fecha_analisis } = datesRes.rows[0]
+  const client = await pool.connect()
+  try {
+    await client.query("BEGIN")
 
-  const informeResult = await pool.query(
-    `INSERT INTO informes
-       (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
-     VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
-    [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
-     fecha_analisis || null, fecha_emision || null]
-  )
-  const informe = informeResult.rows[0]
-
-  for (const aid of analisis_ids) {
-    await pool.query(
-      `UPDATE analisis SET informe_id = $1, numero_informe = $2, estado = 'publicado' WHERE id = $3`,
-      [informe.id, numero_informe, aid]
+    const datesRes = await client.query(
+      `SELECT MIN(m.fecha_muestreo) AS fecha_muestreo, MIN(a.fecha_siembra) AS fecha_analisis
+       FROM analisis a JOIN muestras m ON m.id = a.muestra_id WHERE a.id = ANY($1::int[])`,
+      [analisis_ids]
     )
+    const { fecha_muestreo, fecha_analisis } = datesRes.rows[0]
+
+    const informeResult = await client.query(
+      `INSERT INTO informes
+         (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
+       VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
+      [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
+       fecha_analisis || null, fecha_emision || null]
+    )
+    const informe = informeResult.rows[0]
+
+    for (const aid of analisis_ids) {
+      await client.query(
+        `UPDATE analisis SET informe_id = $1, numero_informe = $2, estado = 'publicado' WHERE id = $3`,
+        [informe.id, numero_informe, aid]
+      )
+    }
+
+    await client.query("COMMIT")
+    res.status(201).json(informe)
+  } catch (err) {
+    await client.query("ROLLBACK")
+    throw err
+  } finally {
+    client.release()
   }
+}))
 
-  res.status(201).json(informe)
-})
-
-// GET /informes → lista de informes publicados (para reimprimir)
-app.get("/informes", async (req, res) => {
+app.get("/informes", auth, wrap(async (req, res) => {
   const result = await pool.query(`
     SELECT i.id, i.numero_informe, i.fecha_emision,
            c.nombre AS cliente_nombre, c.numero_cliente,
@@ -418,13 +471,12 @@ app.get("/informes", async (req, res) => {
     LIMIT 100
   `)
   res.json(result.rows)
-})
+}))
 
-// GET /informes/:id/reporte → todos los datos para imprimir el informe
-app.get("/informes/:id/reporte", async (req, res) => {
+// GET /informes/:id/reporte → datos completos para imprimir (sin N+1: usa json_agg)
+app.get("/informes/:id/reporte", auth, wrap(async (req, res) => {
   const { id } = req.params
 
-  // Informe + cliente
   const infRes = await pool.query(`
     SELECT i.*, c.nombre AS cliente_nombre, c.numero_cliente,
            c.direccion, c.telefono, c.fax
@@ -434,36 +486,39 @@ app.get("/informes/:id/reporte", async (req, res) => {
   if (infRes.rows.length === 0) return res.status(404).json({ error: "No encontrado" })
   const informe = infRes.rows[0]
 
-  // Análisis del informe con datos de muestra, ensayo y contador por cliente
+  // Análisis + resultados en una sola query con json_agg
   const analisisRes = await pool.query(`
     SELECT a.id, a.fecha_siembra, a.ensayo_id,
            m.numero_interno, m.descripcion,
            e.codigo AS ensayo_codigo, e.nombre AS ensayo_nombre,
            ROW_NUMBER() OVER (PARTITION BY m.cliente_id ORDER BY m.numero_interno)
-             AS numero_cliente_secuencial
+             AS numero_cliente_secuencial,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'descripcion',      p.descripcion,
+                 'unidad',           p.unidad,
+                 'valor_referencia', p.valor_referencia,
+                 'valor',            r.valor,
+                 'lectura_dilucion', r.lectura_dilucion
+               )
+               ORDER BY COALESCE(ep.orden, 999), p.codigo
+             ) FILTER (WHERE r.id IS NOT NULL),
+             '[]'::json
+           ) AS resultados
     FROM analisis a
     JOIN muestras m ON m.id = a.muestra_id
     JOIN ensayos  e ON e.id = a.ensayo_id
+    LEFT JOIN resultados r ON r.analisis_id = a.id
+    LEFT JOIN parametros p ON p.id = r.parametro_id
+    LEFT JOIN ensayo_parametros ep ON ep.parametro_id = p.id AND ep.ensayo_id = a.ensayo_id
     WHERE a.informe_id = $1
+    GROUP BY a.id, a.fecha_siembra, a.ensayo_id,
+             m.numero_interno, m.descripcion, m.cliente_id,
+             e.codigo, e.nombre
     ORDER BY m.numero_interno
   `, [id])
 
-  // Resultados por análisis
-  const analisis = []
-  for (const a of analisisRes.rows) {
-    const resRes = await pool.query(`
-      SELECT p.descripcion, p.unidad, r.valor, r.lectura_dilucion,
-             COALESCE(ep.orden, 999) AS orden
-      FROM resultados r
-      JOIN parametros p ON p.id = r.parametro_id
-      LEFT JOIN ensayo_parametros ep ON ep.parametro_id = p.id AND ep.ensayo_id = $2
-      WHERE r.analisis_id = $1
-      ORDER BY orden, p.codigo
-    `, [a.id, a.ensayo_id])
-    analisis.push({ ...a, resultados: resRes.rows })
-  }
-
-  // Metodologías del ensayo del primer análisis
   const ensayoId = analisisRes.rows[0]?.ensayo_id
   let metodologias = []
   if (ensayoId) {
@@ -481,21 +536,18 @@ app.get("/informes/:id/reporte", async (req, res) => {
     ? { codigo: analisisRes.rows[0].ensayo_codigo, nombre: analisisRes.rows[0].ensayo_nombre }
     : { codigo: "—", nombre: "—" }
 
-  res.json({ informe, ensayo, analisis, metodologias })
-})
+  res.json({ informe, ensayo, analisis: analisisRes.rows, metodologias })
+}))
 
-// POST /analisis/:id/resultados → guarda los valores y pasa el análisis a 'cargado'
-app.post("/analisis/:id/resultados", async (req, res) => {
+app.post("/analisis/:id/resultados", auth, wrap(async (req, res) => {
   const { id } = req.params
   const { fecha_siembra, hora_siembra, analista_id, revisor_id, resultados } = req.body
 
-  // Actualizar el análisis con fecha de siembra y estado
   await pool.query(
     `UPDATE analisis SET fecha_siembra=$1, hora_siembra=$2, estado='cargado' WHERE id=$3`,
     [fecha_siembra, hora_siembra || null, id]
   )
 
-  // Insertar un resultado por parámetro (ignorar duplicados por si se guarda dos veces)
   for (const r of resultados) {
     await pool.query(
       `INSERT INTO resultados (analisis_id, parametro_id, valor, lectura_dilucion, analista_id, revisado_por)
@@ -508,12 +560,11 @@ app.post("/analisis/:id/resultados", async (req, res) => {
   }
 
   res.json({ ok: true })
-})
+}))
 
 // ── BACKUP ────────────────────────────────────────────────────────────
 
-// GET /backup/status → lee el log de backups y devuelve las últimas entradas
-app.get("/backup/status", auth, (req, res) => {
+app.get("/backup/status", auth, wrap(async (req, res) => {
   const logPath = process.env.BACKUP_LOG
   if (!logPath) return res.status(500).json({ error: "BACKUP_LOG no configurado en .env" })
 
@@ -531,12 +582,11 @@ app.get("/backup/status", auth, (req, res) => {
     res.json({ entradas })
   } catch (e) {
     if (e.code === "ENOENT") return res.json({ entradas: [], sin_log: true })
-    res.status(500).json({ error: e.message })
+    throw e
   }
-})
+}))
 
-// GET /backup/lista → devuelve los dumps disponibles de frecuentes y diarios
-app.get("/backup/lista", auth, (req, res) => {
+app.get("/backup/lista", auth, wrap(async (req, res) => {
   const logPath = process.env.BACKUP_LOG
   if (!logPath) return res.status(500).json({ error: "BACKUP_LOG no configurado" })
 
@@ -556,33 +606,39 @@ app.get("/backup/lista", auth, (req, res) => {
 
   resultado.sort((a, b) => new Date(b.fecha_mod) - new Date(a.fecha_mod))
   res.json({ backups: resultado })
-})
+}))
 
-// POST /backup/preview → restaura un dump en base temporal y devuelve clientes + informes
-app.post("/backup/preview", auth, async (req, res) => {
+app.post("/backup/preview", auth, wrap(async (req, res) => {
   const { archivo, carpeta } = req.body
   const logPath = process.env.BACKUP_LOG
   if (!logPath) return res.status(500).json({ error: "BACKUP_LOG no configurado" })
 
-  const fullPath = path.join(path.dirname(logPath), carpeta, archivo)
-  if (!fs.existsSync(fullPath)) return res.status(404).json({ error: "Archivo no encontrado" })
+  const backupBase = path.dirname(logPath)
+  const fullPath   = validarRutaBackup(backupBase, carpeta, archivo)
+  if (!fullPath || !fs.existsSync(fullPath)) return res.status(404).json({ error: "Archivo no encontrado" })
 
-  const pgBin  = "C:\\Program Files\\PostgreSQL\\18\\bin"
+  const pgBin  = process.env.PG_BIN || "C:\\Program Files\\PostgreSQL\\18\\bin"
   const env    = { ...process.env, PGPASSWORD: process.env.DB_PASSWORD }
   const tempDb = "zeng_preview_restore"
 
-  spawnSync(path.join(pgBin, "dropdb.exe"),   ["-U", process.env.DB_USER, "--if-exists", tempDb], { env })
-  const cr = spawnSync(path.join(pgBin, "createdb.exe"), ["-U", process.env.DB_USER, tempDb], { env })
+  await spawnAsync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, "--if-exists", tempDb], { env })
+  const cr = await spawnAsync(path.join(pgBin, "createdb.exe"), ["-U", process.env.DB_USER, tempDb], { env })
   if (cr.status !== 0) return res.status(500).json({ error: "No se pudo crear la base temporal" })
 
-  const rr = spawnSync(
-    path.join(pgBin, "pg_restore.exe"),
-    ["-U", process.env.DB_USER, "--no-owner", "--no-privileges", "-d", tempDb, fullPath],
-    { env, timeout: 60000 }
-  )
+  let rr
+  try {
+    rr = await spawnAsync(
+      path.join(pgBin, "pg_restore.exe"),
+      ["-U", process.env.DB_USER, "--no-owner", "--no-privileges", "-d", tempDb, fullPath],
+      { env, timeout: 60000 }
+    )
+  } catch (err) {
+    await spawnAsync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, tempDb], { env }).catch(() => {})
+    throw err
+  }
 
   if (rr.status === null || rr.status > 1) {
-    spawnSync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, tempDb], { env })
+    await spawnAsync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, tempDb], { env }).catch(() => {})
     return res.status(500).json({ error: "Error al leer el backup" })
   }
 
@@ -609,12 +665,11 @@ app.post("/backup/preview", auth, async (req, res) => {
     res.json({ clientes: result.rows })
   } finally {
     await tempPool.end()
-    spawnSync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, tempDb], { env })
+    await spawnAsync(path.join(pgBin, "dropdb.exe"), ["-U", process.env.DB_USER, tempDb], { env }).catch(() => {})
   }
-})
+}))
 
-// POST /backup/restaurar → restaura el backup elegido sobre la base zeng (solo admin)
-app.post("/backup/restaurar", auth, (req, res) => {
+app.post("/backup/restaurar", auth, wrap(async (req, res) => {
   if (req.usuario.rol !== "admin") return res.status(403).json({ error: "Solo el admin puede restaurar" })
 
   const logPath = process.env.BACKUP_LOG
@@ -624,8 +679,8 @@ app.post("/backup/restaurar", auth, (req, res) => {
   let ultimo
 
   if (req.body?.archivo && req.body?.carpeta) {
-    ultimo = path.join(backupBase, req.body.carpeta, req.body.archivo)
-    if (!fs.existsSync(ultimo)) return res.status(404).json({ error: "Archivo no encontrado" })
+    ultimo = validarRutaBackup(backupBase, req.body.carpeta, req.body.archivo)
+    if (!ultimo || !fs.existsSync(ultimo)) return res.status(404).json({ error: "Archivo no encontrado" })
   } else {
     const candidatos = []
     for (const carpeta of ["frecuentes", "diarios"]) {
@@ -639,10 +694,10 @@ app.post("/backup/restaurar", auth, (req, res) => {
     ultimo = candidatos[0]
   }
 
-  const pgBin = "C:\\Program Files\\PostgreSQL\\18\\bin"
+  const pgBin = process.env.PG_BIN || "C:\\Program Files\\PostgreSQL\\18\\bin"
   const env   = { ...process.env, PGPASSWORD: process.env.DB_PASSWORD }
 
-  const result = spawnSync(
+  const result = await spawnAsync(
     path.join(pgBin, "pg_restore.exe"),
     ["-U", process.env.DB_USER, "--clean", "--if-exists", "-d", process.env.DB_NAME, ultimo],
     { env, timeout: 120000 }
@@ -651,18 +706,17 @@ app.post("/backup/restaurar", auth, (req, res) => {
   if (result.status === 0 || result.status === 1) {
     res.json({ ok: true, archivo: path.basename(ultimo) })
   } else {
-    res.status(500).json({ error: result.stderr?.toString() || "Error en pg_restore" })
+    res.status(500).json({ error: result.stderr || "Error en pg_restore" })
   }
-})
+}))
 
 // ── INICIO ────────────────────────────────────────────────────────────
 const PORT = Number(process.env.PORT) || 3001
 
-// En produccion: sirve el frontend compilado (web/dist) desde el mismo proceso
 const distPath = path.join(__dirname, "..", "web", "dist")
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath))
-  app.get("*", (_req, res) => res.sendFile(path.join(distPath, "index.html")))
+  app.use((_req, res) => res.sendFile(path.join(distPath, "index.html")))
 }
 
 app.listen(PORT, () => {

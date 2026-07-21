@@ -33,6 +33,7 @@ export function leerSesion(): UsuarioSesion | null {
     }
     return payload
   } catch {
+    borrarToken()
     return null
   }
 }
