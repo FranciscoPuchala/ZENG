@@ -1222,3 +1222,140 @@ Se creó `docs/PERSONALIZAR_NUEVO_LAB.md` — checklist completo de todo lo espe
 8. `npm run build`
 
 *Actualizado por Claude Code el 21/07/2026.*
+
+---
+
+## Sesión — 21 jul 2026 (noche) — INFORME REAL CON MEMBRETADO + OUA + MEJORAS UX
+
+### Resumen ejecutivo
+
+Sesión intensa de mejoras al Informe de Ensayo. El informe ahora usa las hojas membretadas reales del lab como fondo, el criterio de sello OUA pasó a ser una columna en la base de datos, se ocultó la columna de referencias cuando no hay valores, y se agregó el botón "Impreso" para gestionar la lista de informes publicados.
+
+---
+
+### Membretado real como fondo del informe ✅
+
+**Problema:** el header y footer del informe estaban re-creados en HTML/CSS y no coincidían con los originales.
+
+**Solución:** las dos hojas membretadas del lab (PDFs) se convirtieron a JPG con PyMuPDF a 150dpi y se usan como `background-image` en el div del informe A4.
+
+**Archivos creados:**
+- `web/public/membretado_sin_sello.jpg` — HOJA MEMBRETADA 1.PDF (sin sello OUA), 1240×1754px
+- `web/public/membretado_con_sello.jpg` — HOJA MEMBRETADA 2.PDF (con sello OUA en esquina superior derecha), 1240×1754px
+- `web/public/sello_oua.png` — sello OUA extraído del PDF (solo referencia; no se usa en el informe, el membretado ya lo incluye)
+
+**CSS en `InformeImpresion.tsx`:**
+```tsx
+backgroundImage: `url('/membretado_${conSello ? "con" : "sin"}_sello.jpg')`,
+backgroundSize: "100% 100%",
+printColorAdjust: "exact",
+WebkitPrintColorAdjust: "exact",
+padding: "38mm 13mm 34mm 13mm",
+```
+
+Ya no hay HTML de header ni footer — todo viene del JPG. El contenido queda centrado dentro del área imprimible del membretado.
+
+---
+
+### Criterio de sello OUA → columna `acreditado` en DB ✅
+
+**Antes:** la app chequeaba si el nombre del parámetro empezaba con `(-)` para decidir si el ensayo era OUA o no. Era frágil y no tenía base en los datos.
+
+**Ahora:** tabla `metodologias` tiene columna `acreditado BOOLEAN DEFAULT FALSE`. La función `usaSellosOUA()` en el informe hace `metodologias.some(m => m.acreditado)`.
+
+**Migración:** `db/migracion_metodologias_acreditadas.sql` — aplica `ALTER TABLE` y marca las 7 metodologías acreditadas según el certificado OUA OUAIMP034 Rev.12 (Fuente: PDF oficial del alcance de acreditación):
+
+| Código | Metodología |
+|--------|-------------|
+| 004 | UNE-EN ISO 6579-1:2017/Amd 1:2021 — Salmonella (cultivo) |
+| 034 | ITLAB 075 v14 — BAX PCR E. coli O157:H7/NM |
+| 036 | ITLAB 083 v8 — BAX PCR Salmonella spp |
+| 040 | ITLAB 091 v6 — Petrifilm Enterobacteriaceae (≥10 ufc/g) |
+| 041 | 3M Petrifilm Aerobic Count Plate AOAC 990.12 |
+| 045 | ITLAB 055 v12 — Coliformes totales agua, 9222B |
+| 054 | ITLAB 099 v7 — BAX PCR E. coli no O157 STEC |
+
+Migración ya aplicada en la base. ✅
+
+**API actualizada:** `GET /ensayos/:codigo/plantilla` y `GET /informes/:id/reporte` ahora incluyen `m.acreditado` en el SELECT de metodologías.
+
+---
+
+### Columna "Valores de Referencia" se oculta cuando no hay valores ✅
+
+**`InformeImpresion.tsx`:** lógica `tieneReferencias` por bloque de análisis:
+```ts
+const tieneReferencias = a.resultados.some(r => r.valor_referencia != null && r.valor_referencia !== "")
+```
+- Si `tieneReferencias = true`: tabla de 3 columnas (48% / 26% / 26%) con la tercera columna "Valores de Referencia"
+- Si `tieneReferencias = false`: tabla de 2 columnas (65% / 35%), sin columna de referencias
+
+También se corrigió un bug visual: con `border-collapse`, el `borderRight: "none"` del td de Resultados colapsaba y quedaba la celda "abierta". Fix: `borderRight: tieneReferencias ? "none" : "1px solid black"`.
+
+---
+
+### Botón "Impreso" para limpiar la lista de informes publicados ✅
+
+**Problema:** la tabla de "Informes publicados" acumula todos los informes sin forma de marcarlos como entregados.
+
+**Solución:** botón verde "Impreso ✓" al lado de "Imprimir" en cada fila. Al hacer click el informe desaparece de la lista (se marca en la base, no se borra).
+
+**Migración:** `db/migracion_informes_impreso.sql`
+```sql
+ALTER TABLE informes ADD COLUMN IF NOT EXISTS impreso BOOLEAN NOT NULL DEFAULT FALSE;
+```
+Migración ya aplicada en la base. ✅
+
+**API:**
+- `GET /informes` ahora filtra `WHERE i.impreso = FALSE` — solo muestra los no entregados
+- `PUT /informes/:id/impreso` — nuevo endpoint, marca `impreso = TRUE`
+
+**Frontend (`CuadernoAnalisis.tsx`):**
+- Botón "Impreso ✓" (verde, `border-green-200`) al lado de "Imprimir"
+- `marcarImpreso(id)` llama al endpoint y saca la fila del estado local inmediatamente
+- Al cerrar el modal de impresión, scroll suave a la sección "Informes publicados" (`scrollIntoView`)
+
+---
+
+### Cierre automático del modal al imprimir ⚠️ EN PROCESO
+
+**Problema:** después de imprimir, el modal de InformeImpresion no se cierra solo.
+
+**Intentos realizados:**
+1. `afterprint` + `focus` con `flushSync` → no funcionó (Chrome no dispara `focus` para su diálogo interno)
+2. `afterprint` + `matchMedia('print')` sin `flushSync` → implementado, pendiente de validar
+
+**Estado actual del handler:**
+```tsx
+const mq = window.matchMedia("print")
+const mqHandler = (e) => { if (!e.matches) cerrar() }
+mq.addEventListener("change", mqHandler)
+window.addEventListener("afterprint", cerrar)
+window.print()
+```
+
+**A confirmar con Francisco:** ¿el modal se cierra solo al cancelar/confirmar el diálogo de Chrome?
+
+---
+
+### Estado actual del proyecto (21 jul 2026, noche)
+
+| Componente | Estado |
+|---|---|
+| Informe — membretado real (JPG de fondo) | ✅ Membretado sin sello y con sello según OUA |
+| Informe — criterio OUA via DB | ✅ Columna `acreditado` en `metodologias`, 7 métodos marcados |
+| Informe — columna referencias oculta si no hay valores | ✅ Lógica `tieneReferencias` por bloque |
+| Botón "Impreso" en lista de informes | ✅ Marca en DB + saca de la lista |
+| `GET /informes` filtra entregados | ✅ `WHERE impreso = FALSE` |
+| Cierre automático del modal al imprimir | ⚠️ Implementado, pendiente validar en Chrome |
+| Migraciones pendientes de aplicar | ✅ Ambas ya aplicadas |
+
+### Pendientes principales
+
+1. **Validar cierre del modal** al imprimir desde Chrome — si sigue sin cerrarse, investigar con `console.log` si `afterprint` llega
+2. **Padding del membretado** (`38mm 13mm 34mm 13mm`) — revisar que el contenido no pise el header/footer del JPG en casos con muchos análisis
+3. **Descripciones de los ~145 parámetros placeholder** — pendiente 2ª visita al lab
+4. **Instalar en la PC servidor del lab** con `deploy/instalar.ps1`
+5. **Disco externo de 2TB** — cambiar `BACKUP_DESTINO` en `api/.env`
+
+*Actualizado por Claude Code el 21/07/2026.*

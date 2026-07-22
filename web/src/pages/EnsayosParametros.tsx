@@ -1,5 +1,5 @@
 import * as React from "react"
-import { API } from "@/lib/api"
+import { apiFetch } from "@/lib/api"
 import { Search, Beaker } from "lucide-react"
 import {
   Card, CardHeader, CardTitle, CardDescription, CardContent,
@@ -31,19 +31,24 @@ export function EnsayosParametros() {
   const [cargando, setCargando] = React.useState(true)
 
   React.useEffect(() => {
-    fetch(`${API}/ensayos`)
-      .then(r => r.json())
-      .then(d => { setEnsayos(d); setCargando(false) })
+    apiFetch("/ensayos")
+      .then(r => r.ok ? r.json() : [])
+      .then(d => { setEnsayos(Array.isArray(d) ? d : []); setCargando(false) })
+      .catch(() => setCargando(false))
   }, [])
 
   async function verEnsayo(e: Ensayo) {
     setSeleccionado(e)
     setPlantilla(null)
     setCargandoDetalle(true)
-    const res = await fetch(`${API}/ensayos/${e.codigo}/plantilla`)
-    const data = await res.json()
-    setPlantilla(data)
-    setCargandoDetalle(false)
+    try {
+      const res = await apiFetch(`/ensayos/${e.codigo}/plantilla`)
+      if (res.ok) setPlantilla(await res.json())
+    } catch {
+      // deja plantilla en null → muestra el estado vacío
+    } finally {
+      setCargandoDetalle(false)
+    }
   }
 
   const filtrados = ensayos.filter(e =>

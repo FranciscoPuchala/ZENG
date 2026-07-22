@@ -1,6 +1,6 @@
 import * as React from "react"
 import { apiFetch } from "@/lib/api"
-import { FileCheck2, CheckCircle2, Printer } from "lucide-react"
+import { FileCheck2, CheckCircle2, Printer, CheckCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Toast } from "@/components/ui/toast"
 import { InformeImpresion } from "@/pages/InformeImpresion"
@@ -55,6 +55,7 @@ export function CuadernoAnalisis() {
   const [toastMsg, setToastMsg]                   = React.useState("")
   const [informesPublicados, setInformesPublicados] = React.useState<InformePublicado[]>([])
   const [idsRecienPublicados, setIdsRecienPublicados] = React.useState<number[]>([])
+  const refInformesPublicados = React.useRef<HTMLDivElement>(null)
 
   // Formulario — fechaEmision arranca con hoy para que el N° se genere al toque
   const [numeroInforme,  setNumeroInforme]  = React.useState("")
@@ -68,6 +69,11 @@ export function CuadernoAnalisis() {
       .then(r => r.ok ? r.json() : [])
       .then(setInformesPublicados)
       .catch(() => {})
+  }
+
+  async function marcarImpreso(id: number) {
+    await apiFetch(`/informes/${id}/impreso`, { method: "PUT" })
+    setInformesPublicados(prev => prev.filter(i => i.id !== id))
   }
 
   React.useEffect(() => {
@@ -312,6 +318,7 @@ export function CuadernoAnalisis() {
       )}
 
       {/* Informes publicados — para reimprimir en cualquier momento */}
+      <div ref={refInformesPublicados}>
       <Card>
         <CardHeader>
           <CardTitle>Informes publicados</CardTitle>
@@ -332,7 +339,7 @@ export function CuadernoAnalisis() {
                   <TableHead>Ensayo</TableHead>
                   <TableHead>F. emisión</TableHead>
                   <TableHead className="w-10 text-center">Muestras</TableHead>
-                  <TableHead className="w-24"></TableHead>
+                  <TableHead className="w-44"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -359,14 +366,26 @@ export function CuadernoAnalisis() {
                       {inf.cantidad_analisis}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setInformeId(inf.id)}
-                      >
-                        <Printer className="mr-1 size-3.5" />
-                        Imprimir
-                      </Button>
+                      <div className="flex gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInformeId(inf.id)}
+                        >
+                          <Printer className="mr-1 size-3.5" />
+                          Imprimir
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-700 hover:bg-green-50 hover:text-green-800 border-green-200"
+                          onClick={() => marcarImpreso(inf.id)}
+                          title="Marcar como entregado y sacar de la lista"
+                        >
+                          <CheckCheck className="mr-1 size-3.5" />
+                          Impreso
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -375,6 +394,7 @@ export function CuadernoAnalisis() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       <Toast
         message={toastMsg}
@@ -394,6 +414,9 @@ export function CuadernoAnalisis() {
               setToastMsg("Informe publicado correctamente.")
               setToastVisible(true)
             }
+            setTimeout(() => {
+              refInformesPublicados.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+            }, 50)
           }}
         />
       )}

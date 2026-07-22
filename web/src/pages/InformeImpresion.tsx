@@ -21,7 +21,7 @@ interface Analisis {
   id: number; numero_interno: number; numero_cliente_secuencial: number
   descripcion: string; fecha_siembra: string | null; resultados: Resultado[]
 }
-interface Metodologia { codigo: string; descripcion: string }
+interface Metodologia { codigo: string; descripcion: string; acreditado: boolean }
 interface ReporteData {
   informe: Informe
   ensayo: { codigo: string; nombre: string }
@@ -97,6 +97,12 @@ export function InformeImpresion({
   return createPortal(contenido, portalRoot)
 }
 
+// El informe lleva sello OUA si al menos una metodología del ensayo
+// está dentro del alcance de acreditación OUA LE 006.
+function usaSellosOUA(metodologias: Metodologia[]): boolean {
+  return metodologias.some(m => m.acreditado)
+}
+
 // ── Layout del informe ───────────────────────────────────────────────
 function InformeLayout({
   data, onCerrar, modoConfirmacion,
@@ -106,6 +112,7 @@ function InformeLayout({
   modoConfirmacion: boolean
 }) {
   const { informe, ensayo, analisis, metodologias } = data
+  const conSello = usaSellosOUA(metodologias)
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
@@ -124,8 +131,19 @@ function InformeLayout({
             variant="secondary"
             size="sm"
             onClick={() => {
+              let listo = false
+              const cerrar = () => {
+                if (listo) return
+                listo = true
+                window.removeEventListener("afterprint", cerrar)
+                mq.removeEventListener("change", mqHandler)
+                onCerrar(modoConfirmacion)
+              }
+              const mq = window.matchMedia("print")
+              const mqHandler = (e: MediaQueryListEvent) => { if (!e.matches) cerrar() }
+              mq.addEventListener("change", mqHandler)
+              window.addEventListener("afterprint", cerrar)
               window.print()
-              onCerrar(modoConfirmacion)
             }}
           >
             <Printer /> Imprimir / PDF
@@ -133,25 +151,25 @@ function InformeLayout({
         </div>
       </div>
 
-      {/* Cuerpo del informe — A4 centrado */}
+      {/* Cuerpo del informe — hoja A4 con membretado como fondo */}
       <div
-        className="mx-auto my-6 max-w-[170mm] bg-white px-0 text-black"
-        style={{ fontFamily: "Times New Roman, serif", fontSize: "11pt", lineHeight: 1.35 }}
+        className="mx-auto my-6 text-black"
+        style={{
+          width: "210mm",
+          minHeight: "297mm",
+          backgroundImage: `url('/membretado_${conSello ? "con" : "sin"}_sello.jpg')`,
+          backgroundSize: "100% 100%",
+          backgroundRepeat: "no-repeat",
+          printColorAdjust: "exact",
+          WebkitPrintColorAdjust: "exact",
+          fontFamily: "Times New Roman, serif",
+          fontSize: "11pt",
+          lineHeight: 1.35,
+          boxSizing: "border-box",
+          /* padding: top=zona header | right/left=márgenes laterales | bottom=zona footer */
+          padding: "38mm 13mm 34mm 13mm",
+        }}
       >
-        {/* ── Cabecera ─────────────────────────────────── */}
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 8 }}>
-          <img src="/logo.png" alt="ZENG" style={{ height: 52, objectFit: "contain" }} />
-          <div style={{ textAlign: "right", fontSize: "8pt", color: "#555", lineHeight: 1.4 }}>
-            <div style={{ fontWeight: 700 }}>ORGANISMO URUGUAYO</div>
-            <div style={{ fontWeight: 700 }}>DE ACREDITACIÓN</div>
-            <div>Laboratorio de Ensayo</div>
-            <div style={{ fontWeight: 700 }}>LE 006</div>
-          </div>
-        </div>
-
-        <div style={{ textAlign: "center", fontSize: "9pt", fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "#444", marginBottom: 4 }}>
-          LABORATORIO MICROBIOLÓGICO
-        </div>
 
         <div style={{ textAlign: "center", fontSize: "15pt", fontWeight: 700, marginBottom: 14 }}>
           Informe de Ensayo de<br />
@@ -180,54 +198,61 @@ function InformeLayout({
         </table>
 
         {/* ── Bloques por análisis ─────────────────────── */}
-        {analisis.map(a => (
-          <table key={a.id} style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt", marginBottom: 6, tableLayout: "fixed" }}>
-            <colgroup>
-              <col style={{ width: "48%" }} />
-              <col style={{ width: "26%" }} />
-              <col style={{ width: "26%" }} />
-            </colgroup>
-            <tbody>
-              {/* Cabecera del análisis */}
-              <tr>
-                <td style={{ border: "1px solid black", borderRight: "none", padding: "4px 7px", fontWeight: 700, verticalAlign: "top" }}>
-                  N° de ANÁLISIS{"  "}
-                  {nroAnalisis(informe.numero_cliente, a.numero_cliente_secuencial, a.fecha_siembra)}
-                </td>
-                <td colSpan={2} style={{ border: "1px solid black", padding: "4px 7px", verticalAlign: "top" }}>
-                  <div style={{ fontWeight: 700 }}>DESCRIPCION DE LA MUESTRA</div>
-                  <div>{a.descripcion}</div>
-                </td>
-              </tr>
-
-              {/* Sub-cabecera de columnas */}
-              <tr>
-                <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px" }}></td>
-                <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px", fontWeight: 700, textAlign: "center" }}>
-                  Resultados
-                </td>
-                <td style={{ border: "1px solid black", borderTop: "none", padding: "3px 7px", fontWeight: 700, textAlign: "center" }}>
-                  Valores de Referencia
-                </td>
-              </tr>
-
-              {/* Filas de resultados */}
-              {a.resultados.map((r, i) => (
-                <tr key={i}>
-                  <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px" }}>
-                    {r.descripcion}{r.unidad ? ` (${r.unidad})` : ""}
+        {analisis.map(a => {
+          const tieneReferencias = a.resultados.some(r => r.valor_referencia != null && r.valor_referencia !== "")
+          return (
+            <table key={a.id} style={{ width: "100%", borderCollapse: "collapse", fontSize: "10pt", marginBottom: 6, tableLayout: "fixed" }}>
+              <colgroup>
+                <col style={{ width: tieneReferencias ? "48%" : "65%" }} />
+                <col style={{ width: tieneReferencias ? "26%" : "35%" }} />
+                {tieneReferencias && <col style={{ width: "26%" }} />}
+              </colgroup>
+              <tbody>
+                {/* Cabecera del análisis */}
+                <tr>
+                  <td style={{ border: "1px solid black", borderRight: "none", padding: "4px 7px", fontWeight: 700, verticalAlign: "top" }}>
+                    N° de ANÁLISIS{"  "}
+                    {nroAnalisis(informe.numero_cliente, a.numero_cliente_secuencial, a.fecha_siembra)}
                   </td>
-                  <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px", textAlign: "center" }}>
-                    {r.valor ?? "—"}
-                  </td>
-                  <td style={{ border: "1px solid black", borderTop: "none", padding: "3px 7px", textAlign: "center" }}>
-                    {r.valor_referencia ?? ""}
+                  <td colSpan={tieneReferencias ? 2 : 1} style={{ border: "1px solid black", padding: "4px 7px", verticalAlign: "top" }}>
+                    <div style={{ fontWeight: 700 }}>DESCRIPCION DE LA MUESTRA</div>
+                    <div>{a.descripcion}</div>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ))}
+
+                {/* Sub-cabecera de columnas */}
+                <tr>
+                  <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px" }}></td>
+                  <td style={{ border: "1px solid black", borderTop: "none", borderRight: tieneReferencias ? "none" : "1px solid black", padding: "3px 7px", fontWeight: 700, textAlign: "center" }}>
+                    Resultados
+                  </td>
+                  {tieneReferencias && (
+                    <td style={{ border: "1px solid black", borderTop: "none", padding: "3px 7px", fontWeight: 700, textAlign: "center" }}>
+                      Valores de Referencia
+                    </td>
+                  )}
+                </tr>
+
+                {/* Filas de resultados */}
+                {a.resultados.map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ border: "1px solid black", borderTop: "none", borderRight: "none", padding: "3px 7px" }}>
+                      {r.descripcion}{r.unidad ? ` (${r.unidad})` : ""}
+                    </td>
+                    <td style={{ border: "1px solid black", borderTop: "none", borderRight: tieneReferencias ? "none" : "1px solid black", padding: "3px 7px", textAlign: "center" }}>
+                      {r.valor ?? "—"}
+                    </td>
+                    {tieneReferencias && (
+                      <td style={{ border: "1px solid black", borderTop: "none", padding: "3px 7px", textAlign: "center" }}>
+                        {r.valor_referencia ?? ""}
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        })}
 
         {/* ── Observaciones y firma ────────────────────── */}
         <div style={{ marginBottom: 14, fontSize: "10pt" }}>
@@ -269,22 +294,10 @@ function InformeLayout({
         </div>
 
         {/* ── Pie del timbre ───────────────────────────── */}
-        <div style={{ fontSize: "8.5pt", fontStyle: "italic", textAlign: "center", marginBottom: 8, color: "#333" }}>
+        <div style={{ fontSize: "8.5pt", fontStyle: "italic", textAlign: "center", color: "#333" }}>
           El timbre profesional correspondiente a este documento se aplica en los registros de empresa de acuerdo a disposición de la Caja de Profesionales
         </div>
 
-        {/* ── Pie de página ────────────────────────────── */}
-        <div style={{ borderTop: "1px solid #888", paddingTop: 6, fontSize: "8pt", color: "#444" }}>
-          <div>(–): Estos ensayos NO están comprendidos en el alcance de la acreditación O.U.A. LE NRO 006</div>
-          <div>Ver: www.organismoruguayodeacreditacion.org</div>
-          <div>Reg.MGAP N° 0018: Alcance: www.mgap.gub.uy/DGSG/DILAVE</div>
-          <div style={{ textAlign: "center", marginTop: 4 }}>
-            Mariano Moreno 2746 – Montevideo – Uruguay – Telefax: (598) 2486 46 63
-          </div>
-          <div style={{ textAlign: "center" }}>
-            E-mail: zengsa@adinet.com.uy – zeng@zeng.com.uy – Web: http://www.zeng.com.uy
-          </div>
-        </div>
       </div>
     </div>
   )

@@ -149,30 +149,62 @@ Modelo **cliente-servidor** con **una sola base compartida**:
 - **De dev a prod:** hoy todo corre en `localhost`. En prod: Postgres + backend en el servidor, y el frontend (`web`) apunta su URL de API a la IP del servidor (variable de entorno). Es cambio de config, no rehacer nada.
 - **Servidor:** una de las 4 PC (la más confiable, siempre prendida) o un equipo dedicado (mini-PC / Raspberry). A definir.
 
-## Tarea actual (jul 2026) — Listado de personalización para vender a OTRO laboratorio
+## Estado al 21 jul 2026 (noche) — Informe real con membretado + gestión de entrega
 
-> **IMPORTANTE para Claude Code:** hoy todo está hecho a medida de ZENG. Francisco necesita, para
-> cuando venda el sistema a otro laboratorio, un **checklist claro de TODO lo específico de ZENG que
-> hay que cambiar**. Crear un README en el repo (ej. `docs/PERSONALIZAR_NUEVO_LAB.md`) con ese
-> listado y subirlo.
+El sistema está completo de punta a punta. Últimas mejoras:
 
-**Cómo armarlo:** **escaneá el código** (grep por `zeng`, `ZENG`, `Zeng`, `LE 006`, `MGAP`, la
-dirección/teléfono/emails/web de ZENG, etc.) y listá cada cosa específica del laboratorio, indicando
-**en qué archivo está** y **qué hay que cambiar**. Cubrir al menos:
+- **Informe de Ensayo** usa las hojas membretadas reales del lab como fondo (JPGs en `web/public/`).
+  Hay dos versiones: `membretado_sin_sello.jpg` y `membretado_con_sello.jpg`. El criterio de sello
+  OUA ya no es el prefijo `(-)` — es la columna `acreditado` en la tabla `metodologias` (7 métodos marcados).
+- **Columna "Valores de Referencia"** se oculta automáticamente si el análisis no tiene valores de referencia.
+- **Botón "Impreso ✓"** en la lista de informes publicados: marca el informe como entregado (`impreso = TRUE`
+  en la base) y lo saca de la lista. El `GET /informes` filtra `WHERE impreso = FALSE`.
+- **`docs/PERSONALIZAR_NUEVO_LAB.md`** — checklist para instalar el sistema en otro laboratorio. ✅
 
-1. **Marca / identidad:** el nombre "ZENG", el logo (`web/public/logo.png`), el favicon, y los textos
-   de marca (intro, títulos).
-2. **Datos del lab en el Informe de Ensayo:** nombre, dirección, teléfono, fax, emails, web, N° de
-   acreditación (O.U.A. **LE 006**), Reg. MGAP Nº 0018 — todo lo que hoy dice ZENG en el informe.
-3. **Secretos y credenciales (nuevos por cada lab):** `JWT_SECRET`, contraseña de Postgres,
-   usuarios/admin. `instalar.ps1` ya los genera nuevos, pero dejarlo explícito en el listado.
-4. **Datos propios del lab:** los **clientes** (los 431 cargados son de ZENG) y el **catálogo**
-   (ensayos, parámetros, metodologías, formatos de informe) — otro lab puede tener los suyos.
-   Explicar qué se recarga y cómo.
-5. **Constantes / hardcode** con "zeng" (incluido el nombre de la base `zeng` si conviene
-   parametrizarlo) o rutas específicas.
+### Pendientes principales
 
-Para cada punto: **archivo (y línea si aplica) + qué reemplazar.** El objetivo es que personalizar
-para un lab nuevo sea **seguir una lista**, no cazar cosas por el código.
+1. Validar cierre automático del modal al imprimir (Chrome) — pendiente confirmación de Francisco.
+2. Descripciones reales de los ~145 parámetros placeholder — pendiente 2ª visita al lab.
+3. Instalar en la PC servidor del lab con `deploy/instalar.ps1`.
+4. Disco externo 2TB: cambiar `BACKUP_DESTINO` en `api/.env`.
+5. Formatos especiales de informe (códigos 01 y 121) — pendiente datos del lab.
 
-Al terminar, actualizá `PARA_COWORK.md`.
+Ver detalle completo en `PARA_COWORK.md`.
+
+## Tarea actual (jul 2026) — Acceso directo tipo "app" (doble clic → abre el programa), PASO A PASO
+
+> **IMPORTANTE para Claude Code:** explicá cada paso simple, de a uno, y enseñá el concepto
+> (qué es el "modo app" del navegador, un acceso directo `.lnk`, un `.ico`).
+
+**Contexto:** el **auto-arranque del servidor YA está** (la tarea `ZENG_Backend` de `instalar.ps1`
+arranca el backend al prender la PC; Postgres arranca solo como servicio). Lo que falta es que cada
+PC tenga un **acceso directo que, con doble clic, abra el programa como si fuera una app nativa** —
+en su propia ventana, sin la barra de direcciones ni pestañas del navegador.
+
+### Qué construir — `deploy/crear_acceso.ps1`
+Un script que, en la PC donde se corre:
+1. Recibe (o pide) la **IP:puerto del servidor** (ej. `http://192.168.1.50:3001`). En la PC servidor
+   puede ser `http://localhost:3001`.
+2. Detecta **Edge** o **Chrome** instalado.
+3. Genera un **ícono `.ico`** a partir de `web/public/logo.png` (o usa uno ya preparado).
+4. Crea un **acceso directo en el Escritorio** llamado **"ZENG"** que ejecute el navegador en
+   **modo app**:
+   - Edge: `msedge.exe --app=http://IP:puerto`
+   - Chrome: `chrome.exe --app=http://IP:puerto`
+   El **modo app** abre una ventana propia, **sin barra de direcciones ni pestañas** → parece un
+   programa de escritorio. El ícono del acceso directo = el logo de ZENG.
+
+### Uso
+Se corre **una vez en cada PC** (incluida la servidor). Después, doble clic en el ícono "ZENG" →
+se abre el programa directo en el login.
+
+### Documentar
+Agregar el paso "crear el acceso directo con `crear_acceso.ps1`" en `docs/INSTALACION.md`
+(Parte B — cada PC cliente) y en `deploy/README.md`.
+
+### Opcional (a futuro, más pulido)
+Convertir el frontend en **PWA** (agregar `manifest.json` + service worker) para que se pueda
+"instalar" desde el propio navegador con su ícono. Pero el acceso directo en modo app ya logra el
+efecto sin tocar el código de la app.
+
+Al terminar la sesión, actualizá `PARA_COWORK.md`.

@@ -383,7 +383,7 @@ app.get("/ensayos/:codigo/plantilla", auth, wrap(async (req, res) => {
       [ensayo.id]
     ),
     pool.query(
-      `SELECT m.codigo, m.descripcion
+      `SELECT m.codigo, m.descripcion, m.acreditado
        FROM metodologias m
        JOIN ensayo_metodologias em ON em.metodologia_id = m.id
        WHERE em.ensayo_id = $1
@@ -467,10 +467,18 @@ app.get("/informes", auth, wrap(async (req, res) => {
            (SELECT COUNT(*) FROM analisis a2 WHERE a2.informe_id = i.id) AS cantidad_analisis
     FROM informes i
     JOIN clientes c ON c.id = i.cliente_id
+    WHERE i.impreso = FALSE
     ORDER BY i.id DESC
     LIMIT 100
   `)
   res.json(result.rows)
+}))
+
+// PUT /informes/:id/impreso → marca el informe como entregado/impreso
+app.put("/informes/:id/impreso", auth, wrap(async (req, res) => {
+  const { id } = req.params
+  await pool.query("UPDATE informes SET impreso = TRUE WHERE id = $1", [id])
+  res.json({ ok: true })
 }))
 
 // GET /informes/:id/reporte → datos completos para imprimir (sin N+1: usa json_agg)
@@ -523,7 +531,7 @@ app.get("/informes/:id/reporte", auth, wrap(async (req, res) => {
   let metodologias = []
   if (ensayoId) {
     const metRes = await pool.query(`
-      SELECT m.codigo, m.descripcion
+      SELECT m.codigo, m.descripcion, m.acreditado
       FROM metodologias m
       JOIN ensayo_metodologias em ON em.metodologia_id = m.id
       WHERE em.ensayo_id = $1
