@@ -34,12 +34,17 @@ Es la máquina que va a quedar **siempre prendida** y que tiene la base de datos
 
 ## Parte B — Cada PC cliente (las otras)
 
-**No se instala NADA.** Solo:
+**No se instala NADA.** Solo hay que hacer esto una vez por PC:
 
-1. Abrir el **navegador** (Chrome o Edge).
-2. Ir a la **dirección del servidor** (la que anotaste, ej. `http://192.168.1.50:3001`).
-3. (Recomendado) **Crear un acceso directo** en el escritorio a esa dirección, para entrar de un clic.
+1. Abrir **PowerShell** en la carpeta del proyecto y correr:
+   ```
+   powershell -ExecutionPolicy Bypass -File "deploy\crear_acceso.ps1"
+   ```
+2. El script pregunta la dirección del servidor (ej. `http://192.168.1.50:3001`) y crea el ícono **ZENG** en el Escritorio.
+3. **Doble clic en el ícono ZENG** → el programa se abre en su propia ventana, sin barra de direcciones ni pestañas, como si fuera una aplicación instalada.
 4. **Iniciar sesión** con el usuario de esa persona.
+
+> **¿Qué hace el ícono?** Abre Chrome o Edge en "modo app" (`--app=URL`), que es una ventana limpia sin controles de navegador. El efecto es idéntico a una app de escritorio.
 
 Listo. Todas las PC ven **los mismos datos** porque todas hablan con el mismo servidor.
 

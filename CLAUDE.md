@@ -186,7 +186,8 @@ Un script que, en la PC donde se corre:
 1. Recibe (o pide) la **IP:puerto del servidor** (ej. `http://192.168.1.50:3001`). En la PC servidor
    puede ser `http://localhost:3001`.
 2. Detecta **Edge** o **Chrome** instalado.
-3. Genera un **ícono `.ico`** a partir de `web/public/logo.png` (o usa uno ya preparado).
+3. Usá el **ícono ya generado `deploy/zeng.ico`** (lo dejó listo Cowork a partir del logo real
+   del lab — no hace falta convertir nada, apuntá el acceso directo a ese archivo).
 4. Crea un **acceso directo en el Escritorio** llamado **"ZENG"** que ejecute el navegador en
    **modo app**:
    - Edge: `msedge.exe --app=http://IP:puerto`

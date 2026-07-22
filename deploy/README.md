@@ -53,6 +53,23 @@ URL del servidor: http://192.168.1.50:3001
 
 ---
 
+## Crear el acceso directo "ZENG" en cada PC
+
+Una vez que el servidor está corriendo, correr este script **una vez en cada PC** (incluida la servidor):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "deploy\crear_acceso.ps1"
+```
+
+El script:
+1. Pregunta la dirección del servidor (`http://localhost:3001` en la PC servidor, `http://192.168.1.XX:3001` en las otras)
+2. Detecta Chrome o Edge automáticamente
+3. Crea el ícono **ZENG** en el Escritorio con el logo del laboratorio
+
+Al hacer doble clic en el ícono, el programa se abre en **modo app** — ventana propia sin barra de direcciones ni pestañas, como una aplicación nativa de escritorio.
+
+---
+
 ## Verificar que funciona
 
 1. Abrir una terminal y correr:
