@@ -226,8 +226,31 @@ app.get("/clientes/:id/analisis", auth, wrap(async (req, res) => {
 // ── USUARIOS ──────────────────────────────────────────────────────────
 
 app.get("/usuarios", auth, wrap(async (req, res) => {
-  const result = await pool.query("SELECT * FROM usuarios ORDER BY iniciales")
+  const result = await pool.query("SELECT id, usuario, nombre, iniciales, rol FROM usuarios ORDER BY iniciales")
   res.json(result.rows)
+}))
+
+// PATCH /me/password → cambia la contraseña del usuario logueado
+app.patch("/me/password", auth, wrap(async (req, res) => {
+  const { password_actual, password_nuevo } = req.body
+  if (!password_actual || !password_nuevo) return res.status(400).json({ error: "Faltan datos" })
+  if (password_nuevo.length < 6) return res.status(400).json({ error: "La contraseña nueva debe tener al menos 6 caracteres" })
+  const r = await pool.query("SELECT password_hash FROM usuarios WHERE id = $1", [req.usuario.id])
+  if (!r.rows.length) return res.status(404).json({ error: "Usuario no encontrado" })
+  const ok = await bcrypt.compare(password_actual, r.rows[0].password_hash || "")
+  if (!ok) return res.status(401).json({ error: "Contraseña actual incorrecta" })
+  const hash = await bcrypt.hash(password_nuevo, SALT_ROUNDS)
+  await pool.query("UPDATE usuarios SET password_hash = $1 WHERE id = $2", [hash, req.usuario.id])
+  res.json({ ok: true })
+}))
+
+// DELETE /usuarios/:id → elimina usuario (solo admin, no puede borrarse a sí mismo)
+app.delete("/usuarios/:id", auth, wrap(async (req, res) => {
+  if (req.usuario.rol !== "admin") return res.status(403).json({ error: "Solo el admin puede eliminar usuarios" })
+  const { id } = req.params
+  if (parseInt(id) === req.usuario.id) return res.status(400).json({ error: "No podés eliminar tu propio usuario" })
+  await pool.query("DELETE FROM usuarios WHERE id = $1", [id])
+  res.json({ ok: true })
 }))
 
 // ── ENSAYOS ───────────────────────────────────────────────────────────

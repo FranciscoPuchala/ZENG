@@ -97,7 +97,10 @@ export function AppShell({
 
         {/* Footer — usuario + acciones */}
         <div className="border-t border-white/8 px-3 py-3">
-          <button className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-navy-100/55 transition-all duration-150 hover:bg-navy-800/70 hover:text-white">
+          <button
+            onClick={() => onNavigate?.("Configuración")}
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm text-navy-100/55 transition-all duration-150 hover:bg-navy-800/70 hover:text-white"
+          >
             <Settings className="size-4" />
             Configuración
           </button>

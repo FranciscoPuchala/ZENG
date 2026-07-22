@@ -10,6 +10,7 @@ import { CuadernoAnalisis } from "@/pages/CuadernoAnalisis"
 import { EnsayosParametros } from "@/pages/EnsayosParametros"
 import { Clientes } from "@/pages/Clientes"
 import { Respaldo } from "@/pages/Respaldo"
+import { Configuracion } from "@/pages/Configuracion"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { leerSesion, borrarToken, type UsuarioSesion } from "@/lib/auth"
 
@@ -55,13 +56,15 @@ function App() {
         {active === "Ensayos y Parámetros"&& <EnsayosParametros />}
         {active === "Clientes"            && <Clientes />}
         {active === "Respaldo"            && <Respaldo />}
+        {active === "Configuración"       && <Configuracion usuario={usuario} />}
         {active !== "Panel" &&
           active !== "Ingreso de Muestra" &&
           active !== "Carga de Resultados" &&
           active !== "Cuaderno de Análisis" &&
           active !== "Ensayos y Parámetros" &&
           active !== "Clientes" &&
-          active !== "Respaldo" && <Proximamente nombre={active} />}
+          active !== "Respaldo" &&
+          active !== "Configuración" && <Proximamente nombre={active} />}
       </AppShell>
     </MotionConfig>
   )

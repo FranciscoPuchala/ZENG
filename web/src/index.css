@@ -71,6 +71,16 @@
   html {
     color-scheme: light;
   }
+  html[data-theme="dark"] {
+    color-scheme: dark;
+    --color-background:       #111c28;
+    --color-foreground:       #d8e6f0;
+    --color-card:             #182636;
+    --color-card-foreground:  #d8e6f0;
+    --color-muted:            #1d3045;
+    --color-muted-foreground: #7d9bb5;
+    --color-border:           #243a50;
+  }
   body {
     background: var(--color-background);
     color: var(--color-foreground);
