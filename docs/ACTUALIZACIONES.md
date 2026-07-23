@@ -88,3 +88,9 @@ Verificar: **F5** en el navegador → el rol aparece como **"Auxiliar"**.
 ---
 
 _(Próximas actualizaciones van acá arriba, cada una con su bloque para copiar y pegar.)_
+
+
+
+powershell -ExecutionPolicy Bypass -File "deploy\instalar.ps1"
+
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
