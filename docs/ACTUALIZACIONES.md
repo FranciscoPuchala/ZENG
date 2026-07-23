@@ -94,3 +94,5 @@ _(Próximas actualizaciones van acá arriba, cada una con su bloque para copiar 
 powershell -ExecutionPolicy Bypass -File "deploy\instalar.ps1"
 
 Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d zeng -c "ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check; ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check CHECK (rol IN ('admin','analista','auxiliar'));"
