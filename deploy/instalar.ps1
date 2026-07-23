@@ -129,7 +129,11 @@ foreach ($m in $migraciones) {
 Write-Host ""
 Write-Host "[5/7] Generando api/.env..."
 
-$jwtSecret = [System.Convert]::ToBase64String([System.Security.Cryptography.RandomNumberGenerator]::GetBytes(48))
+# Secreto aleatorio para JWT (compatible con Windows PowerShell 5.1 y PowerShell 7)
+$rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+$rngBytes = New-Object 'System.Byte[]' 48
+$rng.GetBytes($rngBytes)
+$jwtSecret = [System.Convert]::ToBase64String($rngBytes)
 $envPath = Join-Path $repo "api\.env"
 
 @"
