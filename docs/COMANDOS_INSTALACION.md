@@ -30,6 +30,10 @@ Te queda la carpeta **`C:\ZENG`**. (Si pide iniciar sesión, se abre el navegado
 **Con ZIP (alternativa)** — en el repo: botón verde **Code** → **Download ZIP** → extraé. Te queda
 una carpeta `ZENG-main`.
 
+> Recién bajada, la carpeta tiene **sólo el código** (sin dependencias ni configuración). Se vuelve
+> usable cuando corrés el instalador (Pasos 1 y 2). No corras los comandos de actualización sobre una
+> carpeta recién clonada.
+
 ---
 
 ## Paso 1 — Abrir PowerShell como Administrador en la carpeta del proyecto

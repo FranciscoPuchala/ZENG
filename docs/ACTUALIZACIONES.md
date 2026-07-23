@@ -8,6 +8,19 @@ e informes quedan intactos.
 
 ---
 
+## Preparar PowerShell (una sola vez por PC)
+
+Windows bloquea los scripts por defecto, y `npm` es uno (si no, `npm run build` falla con
+`UnauthorizedAccess`). Habilitalo una vez, por usuario:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+```
+
+Cuando pregunte, respondé `S`. Desde ahí, `npm` anda en cualquier PowerShell.
+
+---
+
 ## Receta general (cada vez que actualizás, en la PC servidor)
 
 ```powershell
