@@ -71,21 +71,54 @@ Write-Host "  OK: conexion exitosa."
 Write-Host ""
 Write-Host "[4/7] Creando base de datos 'zeng'..."
 
-# Crear DB (ignora el error si ya existe)
-& "$pgBinDefault\psql.exe" -U postgres -c "CREATE DATABASE zeng;" 2>&1 | Out-Null
+# Que los NOTICE de psql (avisos inofensivos) no aborten la instalacion
+$env:PGOPTIONS = "--client-min-messages=warning"
 
+# Helper: corre psql sin que un NOTICE/stderr corte el script; devuelve el exit code real
+function Invoke-Psql {
+    param([Parameter(Mandatory)][string[]]$PsqlArgs)
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & "$pgBinDefault\psql.exe" @PsqlArgs 2>&1 | Out-Null
+    $code = $LASTEXITCODE
+    $ErrorActionPreference = $prev
+    return $code
+}
+
+# Si la base 'zeng' ya existe, ofrecer recrearla desde cero (instalacion limpia)
+$existe = & "$pgBinDefault\psql.exe" -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='zeng'" 2>$null
+if ("$existe".Trim() -eq "1") {
+    Write-Host "  La base 'zeng' YA EXISTE."
+    $resp = Read-Host "  Borrarla y recrearla desde cero? Se PIERDEN los datos actuales (S/N)"
+    if ($resp -match '^[SsYy]') {
+        Invoke-Psql @("-U","postgres","-c","DROP DATABASE zeng;") | Out-Null
+        Invoke-Psql @("-U","postgres","-c","CREATE DATABASE zeng;") | Out-Null
+        Write-Host "  Base recreada desde cero."
+    } else {
+        Write-Host "  Se mantiene la base existente (se re-aplican migraciones y catalogo)."
+    }
+} else {
+    Invoke-Psql @("-U","postgres","-c","CREATE DATABASE zeng;") | Out-Null
+    Write-Host "  Base 'zeng' creada."
+}
+
+# Esquema + TODAS las migraciones, en orden
 $migraciones = @(
     "db\zeng_esquema_v1.sql",
     "db\migracion_v2.sql",
-    "db\migracion_login.sql"
+    "db\migracion_login.sql",
+    "db\migracion_parametros_defaults.sql",
+    "db\migracion_metodologias_acreditadas.sql",
+    "db\migracion_informes_impreso.sql",
+    "db\migracion_unique_informe.sql"
 )
 foreach ($m in $migraciones) {
     $ruta = Join-Path $repo $m
     if (Test-Path $ruta) {
         Write-Host "  Corriendo $m..."
-        & "$pgBinDefault\psql.exe" -U postgres -d zeng -f $ruta 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  ADVERTENCIA: $m salio con codigo $LASTEXITCODE (puede ser normal si ya existia)"
+        $code = Invoke-Psql @("-v","ON_ERROR_STOP=1","-U","postgres","-d","zeng","-f",$ruta)
+        if ($code -ne 0) {
+            Write-Host "  ADVERTENCIA: $m salio con codigo $code (puede ser normal si ya existia)"
         }
     } else {
         Write-Host "  OMITIDO (no existe): $m"
@@ -114,20 +147,39 @@ PG_BIN=$pgBinDefault
 
 Write-Host "  Archivo creado: $envPath"
 
-# ── 7. Instalar dependencias del backend ─────────────────────────────
+# ── 7. Instalar dependencias del backend + cargar catalogo ───────────
 Write-Host ""
-Write-Host "[6/7] Instalando dependencias del backend..."
+Write-Host "[6/7] Instalando dependencias del backend y cargando catalogo..."
 Push-Location (Join-Path $repo "api")
 npm install --silent
-if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR en npm install del backend"; exit 1 }
-Pop-Location
+if ($LASTEXITCODE -ne 0) { Write-Host "  ERROR en npm install del backend"; Pop-Location; exit 1 }
 
-# Crear usuario admin inicial
-Write-Host "  Creando usuario admin..."
-$adminScript = Join-Path $repo "api\crear_admin.js"
-if (Test-Path $adminScript) {
-    node $adminScript
+# Cargar catalogo real: ensayos, parametros, metodologias y sus relaciones
+# (se corre desde api\ para que lea el archivo .env; los CSV los toma de ..\db)
+Write-Host "  Cargando catalogo (ensayos / parametros / metodologias)..."
+node seed_catalogos.js
+if ($LASTEXITCODE -ne 0) { Write-Host "  ADVERTENCIA: seed_catalogos.js salio con codigo $LASTEXITCODE" }
+
+# Enriquecer parametros: descripciones reales, valores por defecto y de referencia
+$seedParam = Join-Path $repo "db\seed_parametros.sql"
+if (Test-Path $seedParam) {
+    Write-Host "  Cargando descripciones de parametros..."
+    Invoke-Psql @("-v","ON_ERROR_STOP=1","-U","postgres","-d","zeng","-f",$seedParam) | Out-Null
 }
+
+# Cargar clientes reales
+$seedCli = Join-Path $repo "db\seed_clientes.sql"
+if (Test-Path $seedCli) {
+    Write-Host "  Cargando clientes..."
+    Invoke-Psql @("-v","ON_ERROR_STOP=1","-U","postgres","-d","zeng","-f",$seedCli) | Out-Null
+}
+
+# Crear usuario admin inicial (desde api\ para que lea el .env)
+Write-Host "  Creando usuario admin..."
+if (Test-Path "crear_admin.js") {
+    node crear_admin.js
+}
+Pop-Location
 
 # ── 8. Build del frontend ────────────────────────────────────────────
 Write-Host ""

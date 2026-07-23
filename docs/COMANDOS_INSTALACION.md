@@ -14,7 +14,12 @@ que escribir cuando el instalador te lo pregunte.
 
 1. Abrí la carpeta `ZENG-main` en el Explorador (adentro tiene `deploy`, `api`, `web`, `db`).
 2. Copiá su ruta desde la barra de direcciones de arriba.
-3. Inicio → escribí `powershell` → clic derecho → **Ejecutar como administrador**.
+3. Inicio → escribí `powershell` → clic derecho en **Windows PowerShell** → **Ejecutar como administrador** → **Sí**.
+
+   > ⚠️ Confirmá que arriba de la ventana diga **"Administrador: Windows PowerShell"**. Si abrís el
+   > **"Símbolo del sistema" (CMD)** o una ventana **sin** la palabra *Administrador*, el instalador
+   > falla con el error `ScriptRequiresElevation`.
+
 4. Metete en la carpeta (pegá tu ruta entre comillas):
 
 ```powershell
