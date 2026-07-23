@@ -65,6 +65,24 @@ Desde ahí, actualizar es la **receta general** de arriba (`git pull` ...).
 
 Cada entrada tiene los comandos exactos para aplicarla en el servidor. Las nuevas se agregan arriba.
 
+### 2026-07 — "Respaldo" sólo para administradores
+
+- Código: `web/src/components/layout/AppShell.tsx` (el ítem "Respaldo" del menú aparece sólo si el rol es admin).
+- Sin cambios en la base.
+
+Deploy en el servidor:
+
+```powershell
+cd C:\ZENG
+git pull
+cd web
+npm run build
+cd ..
+```
+
+Verificar: **F5** en el navegador. Con un usuario admin se ve "Respaldo"; con analista/auxiliar, no.
+(Es sólo frontend → no hace falta reiniciar el backend.)
+
 ### 2026-07 — Rol "Técnico" → "Auxiliar"
 
 - Código: `web/src/pages/Configuracion.tsx` (la etiqueta y la opción del menú).

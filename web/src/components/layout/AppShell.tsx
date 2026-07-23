@@ -18,6 +18,7 @@ type NavItem = {
   label: string
   icon: React.ComponentType<{ className?: string }>
   etapa?: string
+  adminOnly?: boolean
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -27,7 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Cuaderno de Análisis", icon: FileCheck2,    etapa: "Etapa 3" },
   { label: "Clientes",             icon: Users },
   { label: "Ensayos y Parámetros", icon: Beaker },
-  { label: "Respaldo",             icon: DatabaseBackup },
+  { label: "Respaldo",             icon: DatabaseBackup, adminOnly: true },
 ]
 
 export function AppShell({
@@ -45,6 +46,8 @@ export function AppShell({
 }) {
   const iniciales = usuario.iniciales?.toUpperCase() ?? "?"
   const nombreMostrar = usuario.nombre ?? usuario.usuario
+  const esAdmin = usuario.rol === "admin"
+  const navItems = NAV_ITEMS.filter((item) => !item.adminOnly || esAdmin)
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -65,7 +68,7 @@ export function AppShell({
 
         {/* Nav */}
         <nav className="flex flex-1 flex-col gap-0.5 px-3 pt-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const isActive = item.label === active
             const Icon = item.icon
             return (
