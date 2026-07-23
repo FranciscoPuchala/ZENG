@@ -20,10 +20,10 @@ const preguntar = (q) => new Promise(res => rl.question(q, res))
 
 console.log("\n=== Crear usuario admin — ZENG ===\n")
 
-const usuario   = await preguntar("Nombre de usuario (ej. francisco): ")
-const password  = await preguntar("Contraseña: ")
-const nombre    = await preguntar("Nombre completo (ej. Francisco Puchala): ")
-const iniciales = await preguntar("Iniciales (ej. fp): ")
+const usuario   = await preguntar("Nombre de usuario : ")
+const password  = await preguntar("Contraseña : ")
+const nombre    = await preguntar("Nombre completo : ")
+const iniciales = await preguntar("Iniciales : ")
 rl.close()
 
 const hash = await bcrypt.hash(password, 10)

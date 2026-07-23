@@ -110,7 +110,8 @@ $migraciones = @(
     "db\migracion_parametros_defaults.sql",
     "db\migracion_metodologias_acreditadas.sql",
     "db\migracion_informes_impreso.sql",
-    "db\migracion_unique_informe.sql"
+    "db\migracion_unique_informe.sql",
+    "db\migracion_rol_auxiliar.sql"
 )
 foreach ($m in $migraciones) {
     $ruta = Join-Path $repo $m
