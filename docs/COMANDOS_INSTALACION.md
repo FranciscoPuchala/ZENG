@@ -7,12 +7,35 @@ que escribir cuando el instalador te lo pregunte.
 > **Antes de empezar** (se instalan a mano, con internet, una sola vez):
 > - **PostgreSQL 18** → https://www.postgresql.org/download/windows/ (anotá la contraseña de `postgres`).
 > - **Node.js LTS** → https://nodejs.org (en el instalador **NO tildes** "Tools for Native Modules").
+> - **Git** (recomendado) → https://git-scm.com/download/win (siguiente-siguiente-finalizar). Sirve para
+>   traer el proyecto y, sobre todo, para **actualizarlo** después con un solo comando. Cerrá y reabrí
+>   PowerShell después de instalarlo.
+
+---
+
+## Paso 0 — Traer el proyecto al servidor
+
+Dos formas de bajar la carpeta del proyecto. **Git es lo recomendado**, porque después actualizar
+el sistema es un solo comando (`git pull`).
+
+**Con Git (recomendado)** — abrí PowerShell y:
+
+```powershell
+cd C:\
+git clone https://github.com/FranciscoPuchala/ZENG.git
+```
+
+Te queda la carpeta **`C:\ZENG`**. (Si pide iniciar sesión, se abre el navegador → entrá con tu GitHub.)
+
+**Con ZIP (alternativa)** — en el repo: botón verde **Code** → **Download ZIP** → extraé. Te queda
+una carpeta `ZENG-main`.
 
 ---
 
 ## Paso 1 — Abrir PowerShell como Administrador en la carpeta del proyecto
 
-1. Abrí la carpeta `ZENG-main` en el Explorador (adentro tiene `deploy`, `api`, `web`, `db`).
+1. Abrí la carpeta del proyecto en el Explorador (`C:\ZENG` si usaste Git, o `ZENG-main` si usaste ZIP;
+   adentro tiene `deploy`, `api`, `web`, `db`).
 2. Copiá su ruta desde la barra de direcciones de arriba.
 3. Inicio → escribí `powershell` → clic derecho en **Windows PowerShell** → **Ejecutar como administrador** → **Sí**.
 
@@ -23,8 +46,9 @@ que escribir cuando el instalador te lo pregunte.
 4. Metete en la carpeta (pegá tu ruta entre comillas):
 
 ```powershell
-cd "C:\Users\TuUsuario\Downloads\ZENG-main"
+cd "C:\ZENG"
 ```
+(Si usaste ZIP, la ruta es la de tu carpeta `ZENG-main`, ej. `cd "C:\Users\TuUsuario\Downloads\ZENG-main"`.)
 
 ---
 
@@ -86,13 +110,13 @@ Buscá la línea **"Dirección IPv4"** (ej. `192.168.1.50`).
 
 **Arrancar el backend a mano** (para probar / ver errores):
 ```powershell
-cd "C:\Users\TuUsuario\Downloads\ZENG-main\api"
+cd "C:\ZENG\api"
 node index.js
 ```
 
 **Crear otro usuario** (admin u otro):
 ```powershell
-cd "C:\Users\TuUsuario\Downloads\ZENG-main\api"
+cd "C:\ZENG\api"
 node crear_admin.js
 ```
 
