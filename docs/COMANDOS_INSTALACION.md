@@ -141,3 +141,6 @@ powershell -ExecutionPolicy Bypass -File "deploy\crear_acceso.ps1"
 Dirección: `http://IP-DEL-SERVIDOR:3001`
 
 Doble clic en el ícono ZENG → login. Todas las PC ven **los mismos datos** (mismo servidor).
+
+
+Set-ScheduledTask -TaskName "ZENG_Backend" -Settings (New-ScheduledTaskSettingsSet -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Hours 0) -DisallowStartIfOnBatteries $false -StopIfGoingOnBatteries $false)
