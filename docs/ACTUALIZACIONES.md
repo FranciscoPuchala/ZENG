@@ -6,28 +6,31 @@ El **código** y los **datos** están separados. Actualizar el código **nunca b
 **no se reinstala nada** (el `instalar.ps1` es sólo para la primera vez). Los usuarios, muestras
 e informes quedan intactos.
 
+> **Cómo funciona (importante):** un cambio se guarda primero en el repo de tu **compu principal**,
+> pero **no va solo a GitHub**. El servidor del lab sólo puede bajar lo que **ya está en GitHub**.
+> Por eso el circuito es SIEMPRE:
+>
+> **1)** commit + push desde tu **compu principal** → **2)** `git reset --hard` + build en el **servidor**.
+
 ---
 
-## Preparar PowerShell (una sola vez por PC)
+## Receta general
 
-Windows bloquea los scripts por defecto, y `npm` es uno (si no, `npm run build` falla con
-`UnauthorizedAccess`). Habilitalo una vez, por usuario:
+### Paso 1 — En tu compu principal (donde se hacen los cambios)
 
 ```powershell
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
+git add .
+git commit -m "descripción del cambio"
+git push
 ```
 
-Cuando pregunte, respondé `S`. Desde ahí, `npm` anda en cualquier PowerShell.
-
----
-
-## Receta general (cada vez que actualizás, en la PC servidor)
+### Paso 2 — En la PC servidor del lab (carpeta `C:\ZENGsistema`)
 
 ```powershell
-cd C:\ZENG
-git pull
+git fetch
+git reset --hard origin/main
 cd web
-npm run build
+npm.cmd run build
 cd ..
 Stop-ScheduledTask -TaskName "ZENG_Backend"
 Start-ScheduledTask -TaskName "ZENG_Backend"
@@ -35,11 +38,23 @@ Start-ScheduledTask -TaskName "ZENG_Backend"
 
 Las otras PC: sólo **F5** en el navegador y ven la versión nueva.
 
-Notas:
-- El Stop/Start necesita PowerShell **como Administrador**.
-- Si el cambio **toca la base** (agregar campo, renombrar algo), además corré su migración — ver cada
-  actualización abajo. Si es **sólo código** (lo más común), no hace falta.
-- `npm run build` **no necesita internet** (usa lo ya instalado), así que en el lab offline también anda.
+**Notas importantes:**
+- Usá **`npm.cmd run build`** (no `npm run build`): así no lo bloquea la política de scripts de Windows.
+- **`git reset --hard origin/main`** deja el servidor **idéntico a GitHub** (descarta parches locales; en el
+  servidor no debería haber ediciones a mano). Evita el conflicto de `instalar.ps1` que frenaba el `git pull`.
+- El Stop/Start del backend necesita PowerShell **como Administrador**.
+- Si el cambio es **sólo frontend** (un color, un texto): con `git reset` + `npm.cmd run build` + **F5** alcanza,
+  no hace falta reiniciar el backend. Reiniciás sólo si el cambio toca el **backend** (`api/`).
+- Si el cambio **toca la base** (agregar campo, migración): corré además su `.sql` — ver cada actualización abajo.
+- `npm.cmd run build` **no necesita internet**.
+
+### ¿Cómo sé que quedó actualizado?
+
+En el servidor:
+```powershell
+git status
+```
+Tiene que decir **"up to date with 'origin/main'"** y **"nothing to commit"**.
 
 ---
 
@@ -48,7 +63,7 @@ Notas:
 Si la carpeta la bajaste por **ZIP**, conectala una vez a Git (no pierde `node_modules` ni tu `.env`):
 
 ```powershell
-cd "C:\Users\TuUsuario\Downloads\ZENG-main"
+cd "RUTA\A\TU\CARPETA"
 git init
 git remote add origin https://github.com/FranciscoPuchala/ZENG.git
 git fetch origin
@@ -57,60 +72,69 @@ git branch -M main
 git branch --set-upstream-to=origin/main main
 ```
 
-Desde ahí, actualizar es la **receta general** de arriba (`git pull` ...).
-
 ---
 
 ## Registro de actualizaciones
 
-Cada entrada tiene los comandos exactos para aplicarla en el servidor. Las nuevas se agregan arriba.
+Cada entrada tiene los comandos del **servidor**. Las nuevas se agregan arriba. (Antes, siempre hacé
+commit + push desde tu compu principal.)
+
+### 2026-07 — Modo oscuro: Carga de Resultados
+
+- Código: `web/src/pages/CargaResultados.tsx` (colores claros fijos → versiones con opacidad, se adaptan a claro/oscuro). Sólo frontend.
+
+```powershell
+git fetch
+git reset --hard origin/main
+cd web
+npm.cmd run build
+cd ..
+```
+Verificar: **F5**, modo oscuro, seleccionar una muestra → la fila se ve teal suave (no blanca).
+
+### 2026-07 — Traducción de Chrome (pantalla en blanco)
+
+- Código: `web/index.html` (`lang="es" translate="no"` para que Chrome no traduzca y no rompa React). Sólo frontend.
+
+```powershell
+git fetch
+git reset --hard origin/main
+cd web
+npm.cmd run build
+cd ..
+```
+Verificar: `Select-String -Path "C:\ZENGsistema\web\dist\index.html" -Pattern "translate"` muestra `translate="no"`.
 
 ### 2026-07 — "Respaldo" sólo para administradores
 
-- Código: `web/src/components/layout/AppShell.tsx` (el ítem "Respaldo" del menú aparece sólo si el rol es admin).
-- Sin cambios en la base.
-
-Deploy en el servidor:
+- Código: `web/src/components/layout/AppShell.tsx`. Sólo frontend.
 
 ```powershell
-cd C:\ZENG
-git pull
+git fetch
+git reset --hard origin/main
 cd web
-npm run build
+npm.cmd run build
 cd ..
 ```
+Verificar: con admin se ve "Respaldo"; con analista/auxiliar, no.
 
-Verificar: **F5** en el navegador. Con un usuario admin se ve "Respaldo"; con analista/auxiliar, no.
-(Es sólo frontend → no hace falta reiniciar el backend.)
+### 2026-07 — Rol "Técnico" → "Auxiliar" + informes acumulativos
 
-### 2026-07 — Rol "Técnico" → "Auxiliar"
-
-- Código: `web/src/pages/Configuracion.tsx` (la etiqueta y la opción del menú).
-- Base: `db/migracion_rol_auxiliar.sql` (renombra el rol de los usuarios que ya lo tenían; no borra nada).
-
-Deploy en el servidor:
+- Código: `web/src/pages/Configuracion.tsx` + `api/index.js` (informes acumulativos). Base: `db/migracion_rol_auxiliar.sql`.
+- Toca **frontend + backend + base**:
 
 ```powershell
-cd C:\ZENG
-git pull
+git fetch
+git reset --hard origin/main
 cd web
-npm run build
+npm.cmd run build
 cd ..
 & "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d zeng -f db\migracion_rol_auxiliar.sql
 Stop-ScheduledTask -TaskName "ZENG_Backend"
 Start-ScheduledTask -TaskName "ZENG_Backend"
 ```
-
-Verificar: **F5** en el navegador → el rol aparece como **"Auxiliar"**.
+Verificar: **F5** → el rol aparece como **"Auxiliar"** y se pueden crear usuarios con ese rol.
 
 ---
 
 _(Próximas actualizaciones van acá arriba, cada una con su bloque para copiar y pegar.)_
-
-
-
-powershell -ExecutionPolicy Bypass -File "deploy\instalar.ps1"
-
-Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
-
-& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d zeng -c "ALTER TABLE usuarios DROP CONSTRAINT IF EXISTS usuarios_rol_check; ALTER TABLE usuarios ADD CONSTRAINT usuarios_rol_check CHECK (rol IN ('admin','analista','auxiliar'));"
