@@ -451,25 +451,18 @@ app.post("/informes", auth, wrap(async (req, res) => {
     )
     const { fecha_muestreo, fecha_analisis } = datesRes.rows[0]
 
-    // Si ya existe un informe con ese número, agrupamos ahí (una muestra con
-    // varias sub-muestras va toda en UN mismo informe, aunque se publique de a una).
-    const existente = await client.query(
-      `SELECT * FROM informes WHERE numero_informe = $1`,
-      [numero_informe]
+    // Cada publicación crea un informe INDEPENDIENTE. Varios análisis van en el
+    // mismo informe sólo si se seleccionan y publican juntos (en analisis_ids).
+    // Si el numero_informe ya existe, la restricción UNIQUE lo rechaza y el catch
+    // devuelve un mensaje claro (409) para que se use otro número.
+    const informeResult = await client.query(
+      `INSERT INTO informes
+         (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
+       VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
+      [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
+       fecha_analisis || null, fecha_emision || null]
     )
-    let informe
-    if (existente.rows.length > 0) {
-      informe = existente.rows[0]
-    } else {
-      const informeResult = await client.query(
-        `INSERT INTO informes
-           (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
-         VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
-        [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
-         fecha_analisis || null, fecha_emision || null]
-      )
-      informe = informeResult.rows[0]
-    }
+    const informe = informeResult.rows[0]
 
     for (const aid of analisis_ids) {
       await client.query(
