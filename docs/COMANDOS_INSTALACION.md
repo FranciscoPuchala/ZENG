@@ -149,3 +149,5 @@ cd C:\
 git clone https://github.com/FranciscoPuchala/ZENG.git ZENGSistema
 cd C:\ZENGSistema
 powershell -ExecutionPolicy Bypass -File "deploy\instalar.ps1"
+
+(Get-Content "C:\ZENGSistema\deploy\instalar.ps1") -replace '-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries','-AllowStartIfOnBatteries -DontStopIfGoingOnBatteries' | Set-Content "C:\ZENGSistema\deploy\instalar.ps1"
