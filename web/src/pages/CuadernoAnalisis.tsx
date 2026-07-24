@@ -214,7 +214,7 @@ export function CuadernoAnalisis() {
                       onClick={() => !isDisabled && toggleSeleccion(a)}
                       className={[
                         isDisabled ? "cursor-not-allowed opacity-40" : "cursor-pointer",
-                        isSel ? "bg-teal-50 hover:bg-teal-50" : !isDisabled ? "hover:bg-muted/40" : "",
+                        isSel ? "bg-teal-500/10 hover:bg-teal-500/10" : !isDisabled ? "hover:bg-muted/40" : "",
                       ].join(" ")}
                     >
                       <TableCell>
@@ -378,7 +378,7 @@ export function CuadernoAnalisis() {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="text-green-700 hover:bg-green-50 hover:text-green-800 border-green-200"
+                          className="text-green-600 hover:bg-green-500/10 hover:text-green-500 border-green-500/40"
                           onClick={() => marcarImpreso(inf.id)}
                           title="Marcar como entregado y sacar de la lista"
                         >

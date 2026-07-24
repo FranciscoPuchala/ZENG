@@ -453,13 +453,24 @@ app.post("/informes", auth, wrap(async (req, res) => {
 
     // Cada publicación crea un informe INDEPENDIENTE. Varios análisis van en el
     // mismo informe sólo si se seleccionan y publican juntos (en analisis_ids).
-    // Si el numero_informe ya existe, la restricción UNIQUE lo rechaza y el catch
-    // devuelve un mensaje claro (409) para que se use otro número.
+    // Si el numero_informe ya existe, se auto-agrega un sufijo "-2", "-3", ... para
+    // que NO choque ni crashee (quedan como informes separados con número único).
+    let numeroFinal = numero_informe
+    let n = 1
+    while (true) {
+      const ocupado = await client.query(
+        `SELECT 1 FROM informes WHERE numero_informe = $1`, [numeroFinal]
+      )
+      if (ocupado.rows.length === 0) break
+      n++
+      numeroFinal = `${numero_informe}-${n}`
+    }
+
     const informeResult = await client.query(
       `INSERT INTO informes
          (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
        VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
-      [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
+      [cliente_id, numeroFinal, fecha_muestreo || null, fecha_recepcion || null,
        fecha_analisis || null, fecha_emision || null]
     )
     const informe = informeResult.rows[0]
@@ -467,7 +478,7 @@ app.post("/informes", auth, wrap(async (req, res) => {
     for (const aid of analisis_ids) {
       await client.query(
         `UPDATE analisis SET informe_id = $1, numero_informe = $2, estado = 'publicado' WHERE id = $3`,
-        [informe.id, numero_informe, aid]
+        [informe.id, numeroFinal, aid]
       )
     }
 
