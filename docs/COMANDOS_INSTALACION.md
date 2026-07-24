@@ -145,3 +145,7 @@ Doble clic en el ícono ZENG → login. Todas las PC ven **los mismos datos** (m
 
 Set-ScheduledTask -TaskName "ZENG_Backend" -Settings (New-ScheduledTaskSettingsSet -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Hours 0) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries)
 
+cd C:\
+git clone https://github.com/FranciscoPuchala/ZENG.git ZENGSistema
+cd C:\ZENGSistema
+powershell -ExecutionPolicy Bypass -File "deploy\instalar.ps1"

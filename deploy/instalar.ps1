@@ -206,7 +206,7 @@ $nodePath  = (Get-Command node).Source
 # -- Backend: arrancar con Windows --
 $actionBack = New-ScheduledTaskAction -Execute $nodePath -Argument (Join-Path $repo "api\index.js") -WorkingDirectory (Join-Path $repo "api")
 $triggerBack = New-ScheduledTaskTrigger -AtStartup
-$settingsBack = New-ScheduledTaskSettingsSet -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Hours 0) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+$settingsBack = New-ScheduledTaskSettingsSet -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit (New-TimeSpan -Hours 0) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
 $principalBack = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 Register-ScheduledTask -TaskName "ZENG_Backend" -Action $actionBack -Trigger $triggerBack -Settings $settingsBack -Principal $principalBack -Force | Out-Null
 Write-Host "  OK: tarea ZENG_Backend (arranca con Windows)"
