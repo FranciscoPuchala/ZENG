@@ -451,14 +451,25 @@ app.post("/informes", auth, wrap(async (req, res) => {
     )
     const { fecha_muestreo, fecha_analisis } = datesRes.rows[0]
 
-    const informeResult = await client.query(
-      `INSERT INTO informes
-         (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
-       VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
-      [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
-       fecha_analisis || null, fecha_emision || null]
+    // Si ya existe un informe con ese número, agrupamos ahí (una muestra con
+    // varias sub-muestras va toda en UN mismo informe, aunque se publique de a una).
+    const existente = await client.query(
+      `SELECT * FROM informes WHERE numero_informe = $1`,
+      [numero_informe]
     )
-    const informe = informeResult.rows[0]
+    let informe
+    if (existente.rows.length > 0) {
+      informe = existente.rows[0]
+    } else {
+      const informeResult = await client.query(
+        `INSERT INTO informes
+           (cliente_id, numero_informe, fecha_muestreo, fecha_recepcion, fecha_analisis, fecha_emision, publicado, fecha_publicado)
+         VALUES ($1, $2, $3, $4, $5, $6, true, CURRENT_DATE) RETURNING *`,
+        [cliente_id, numero_informe, fecha_muestreo || null, fecha_recepcion || null,
+         fecha_analisis || null, fecha_emision || null]
+      )
+      informe = informeResult.rows[0]
+    }
 
     for (const aid of analisis_ids) {
       await client.query(
@@ -471,6 +482,9 @@ app.post("/informes", auth, wrap(async (req, res) => {
     res.status(201).json(informe)
   } catch (err) {
     await client.query("ROLLBACK")
+    if (err.code === "23505") {
+      return res.status(409).json({ error: `Ya existe un informe con el número "${numero_informe}". Cambiá el número de informe antes de publicar.` })
+    }
     throw err
   } finally {
     client.release()
