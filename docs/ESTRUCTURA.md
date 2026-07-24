@@ -97,8 +97,9 @@ Mapa de qué es cada carpeta y cada archivo. Sirve para ubicarse rápido al reto
 - `zeng.ico` — el ícono de la app.
 - `.env.example` — plantilla del archivo `.env`.
 - `README.md` — documentación técnica del instalador.
-- `reiniciar_servidor.vbs` — reinicia el backend. ⚠️ **Tiene una ruta fija del equipo de desarrollo**
-  (`C:\Users\franp\...`), así que **no va a funcionar en el servidor** hasta arreglarla (ver Limpieza).
+- `reiniciar_servidor.ps1` — reinicia el backend (la tarea ZENG_Backend) **sin apagar la PC**. El
+  instalador crea un acceso directo "Reiniciar servidor ZENG" en el Escritorio que lo ejecuta.
+- `reiniciar_servidor.vbs` — versión vieja con ruta fija. **Reemplazada por el `.ps1`** → se puede borrar.
 
 ---
 
@@ -132,4 +133,4 @@ Archivos sueltos o repetidos que conviene acomodar (borralos/movés desde VS Cod
 2. **Raíz** — `prompt-claude-code-ui-ux.md`: un prompt viejo de diseño → moverlo a `docs/` o **borrarlo**.
 3. **Raíz** — `ZENG - Estado del proyecto.pdf` y `ZENG_-_Estado_del_proyecto.pdf`: son **dos versiones** del mismo PDF → quedate con la última y movela a `docs/`.
 4. **docs/** — `ACTUALIZAR_SISTEMA.md`: quedó como un simple **puntero** a `ACTUALIZACIONES.md` → se puede **borrar**.
-5. **deploy/** — `reiniciar_servidor.vbs`: arreglar la **ruta fija** para que sirva en cualquier PC servidor.
+5. **deploy/** — `reiniciar_servidor.vbs`: reemplazado por `reiniciar_servidor.ps1` → se puede **borrar**.

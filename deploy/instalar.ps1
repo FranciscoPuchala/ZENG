@@ -246,6 +246,23 @@ Write-Host "Configurando firewall para el puerto $puerto..."
 New-NetFirewallRule -DisplayName "ZENG Backend" -Direction Inbound -Protocol TCP -LocalPort $puerto -Action Allow -Profile Any -ErrorAction SilentlyContinue | Out-Null
 Write-Host "  OK: puerto $puerto abierto en el firewall."
 
+# ── 11. Acceso directo "Reiniciar servidor ZENG" en el Escritorio ────
+Write-Host ""
+Write-Host "Creando acceso directo 'Reiniciar servidor ZENG'..."
+$reiniciarPs = Join-Path $repo "deploy\reiniciar_servidor.ps1"
+$icoZeng     = Join-Path $repo "deploy\zeng.ico"
+$escritorioR = [Environment]::GetFolderPath("Desktop")
+$lnkReinicio = Join-Path $escritorioR "Reiniciar servidor ZENG.lnk"
+$wshR = New-Object -ComObject WScript.Shell
+$lnkR = $wshR.CreateShortcut($lnkReinicio)
+$lnkR.TargetPath       = $psExe
+$lnkR.Arguments        = "-ExecutionPolicy Bypass -File `"$reiniciarPs`""
+$lnkR.Description       = "Reiniciar el servidor ZENG sin reiniciar la PC"
+$lnkR.WorkingDirectory = Join-Path $repo "deploy"
+if (Test-Path $icoZeng) { $lnkR.IconLocation = "$icoZeng,0" }
+$lnkR.Save()
+Write-Host "  OK: acceso directo 'Reiniciar servidor ZENG' en el Escritorio."
+
 # ── Resumen final ────────────────────────────────────────────────────
 $ip = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.InterfaceAlias -notmatch "Loopback" -and $_.IPAddress -notmatch "^169" } | Select-Object -First 1).IPAddress
 
@@ -261,4 +278,7 @@ Write-Host "  Para iniciar el backend ahora mismo:"
 Write-Host "    node api\index.js"
 Write-Host ""
 Write-Host "  El backend arranca automaticamente con Windows (tarea ZENG_Backend)."
+Write-Host ""
+Write-Host "  En el Escritorio quedo el icono 'Reiniciar servidor ZENG' por si"
+Write-Host "  alguna vez necesitas reiniciarlo sin apagar la PC."
 Write-Host ""
