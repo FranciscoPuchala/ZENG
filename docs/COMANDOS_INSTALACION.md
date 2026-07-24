@@ -60,6 +60,7 @@ cd "C:\ZENG"
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "deploy\instalar.ps1"
+
 ```
 
 Te va a preguntar, en este orden:
@@ -151,3 +152,5 @@ cd C:\ZENGSistema
 powershell -ExecutionPolicy Bypass -File "deploy\instalar.ps1"
 
 (Get-Content "C:\ZENGSistema\web\dist\index.html") -replace 'lang="en"','lang="es" translate="no"' | Set-Content "C:\ZENGSistema\web\dist\index.html"
+
+Select-String -Path "C:\ZENGsistema\web\dist\index.html" -Pattern "translate"
