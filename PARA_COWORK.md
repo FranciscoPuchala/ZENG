@@ -90,7 +90,7 @@ npm run dev
 | POST | `/muestras` | Crea muestra + analisis por cada ensayo seleccionado |
 
 **Detalle importante de `POST /muestras`:**
-- Calcula el `numero_interno` global automáticamente (MAX + 1, arranca desde 228000)
+- Calcula el `numero_interno` global automáticamente (MAX + 1, arranca desde 1)
 - Recibe `ensayo_ids[]` y crea una fila en `analisis` por cada uno, en estado `pendiente`
 - Cuerpo esperado: `{ cliente_id, descripcion, fecha_entrada, hora_entrada, fecha_muestreo, recibido_por, observaciones, ensayo_ids }`
 

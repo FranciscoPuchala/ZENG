@@ -306,7 +306,7 @@ app.post("/muestras", auth, wrap(async (req, res) => {
     await client.query("SELECT pg_advisory_xact_lock(42)")
 
     const maxResult = await client.query(
-      "SELECT COALESCE(MAX(numero_interno), 228000) + 1 AS siguiente FROM muestras"
+      "SELECT COALESCE(MAX(numero_interno), 0) + 1 AS siguiente FROM muestras"
     )
     const numero_interno = maxResult.rows[0].siguiente
 

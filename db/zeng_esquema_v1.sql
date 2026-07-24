@@ -58,7 +58,7 @@ CREATE TABLE parametros (
 -- Muestras que entran  (etapa 1: Cuaderno de Entrada)
 CREATE TABLE muestras (
     id              SERIAL PRIMARY KEY,
-    numero_interno  BIGINT       NOT NULL UNIQUE,    -- contador GLOBAL (+1 por muestra, ej. 228992). Es el mismo N de las 3 etapas.
+    numero_interno  BIGINT       NOT NULL UNIQUE,    -- contador GLOBAL (+1 por muestra, arranca en 1). Es el mismo N de las 3 etapas.
     cliente_id      INTEGER      NOT NULL REFERENCES clientes(id),
     descripcion     VARCHAR(250),                    -- ej. '5 muestras de carne'
     fecha_entrada   DATE         NOT NULL,
