@@ -66,7 +66,7 @@ function SelectorBoton({
           className={[
             "flex h-8 flex-1 items-center justify-center rounded-md border px-1.5 text-[11px] font-medium transition-colors",
             value === op
-              ? "border-green-400 bg-green-100 text-green-800"
+              ? "border-green-500/50 bg-green-500/15 text-green-600"
               : "border-border bg-card text-muted-foreground hover:bg-muted",
           ].join(" ")}
         >
@@ -300,7 +300,7 @@ export function CargaResultados() {
                       key={g.codigo}
                       className={cn(
                         "rounded-md border transition-colors",
-                        abierto ? "border-teal-300 bg-teal-50/50" : "border-border"
+                        abierto ? "border-teal-500/40 bg-teal-500/10" : "border-border"
                       )}
                     >
                       {/* Cabecera del grupo */}
@@ -427,7 +427,7 @@ export function CargaResultados() {
                         type="button"
                         onClick={() => seleccionar(a)}
                         className={`flex w-full cursor-pointer items-center gap-3 border-b border-border px-5 py-3.5 text-left transition-colors last:border-0 hover:bg-muted/50 ${
-                          isActive ? "bg-teal-50 hover:bg-teal-50" : ""
+                          isActive ? "bg-teal-500/10 hover:bg-teal-500/10" : ""
                         }`}
                       >
                         <div className="min-w-0 flex-1">
@@ -552,7 +552,7 @@ export function CargaResultados() {
                           return (
                           <TableRow
                             key={p.id}
-                            className={conError ? "bg-red-50" : ""}
+                            className={conError ? "bg-red-500/10" : ""}
                           >
                             <TableCell>
                               <div className="text-sm">{p.descripcion}</div>
@@ -596,7 +596,7 @@ export function CargaResultados() {
                                   eliminarParametro(p.id)
                                   setErrorValores(prev => prev.filter(id => id !== p.id))
                                 }}
-                                className="flex size-7 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-red-50 hover:text-red-500"
+                                className="flex size-7 items-center justify-center rounded text-muted-foreground/50 transition-colors hover:bg-red-500/10 hover:text-red-500"
                               >
                                 <X className="size-3.5" />
                               </button>
