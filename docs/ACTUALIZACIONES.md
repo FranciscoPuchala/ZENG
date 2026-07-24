@@ -79,6 +79,19 @@ git branch --set-upstream-to=origin/main main
 Cada entrada tiene los comandos del **servidor**. Las nuevas se agregan arriba. (Antes, siempre hacé
 commit + push desde tu compu principal.)
 
+### 2026-07 — Impresión del informe a página completa
+
+- Código: `web/src/index.css` (`@page { margin: 0 }` → la hoja ocupa toda la página y se van el "ZENG" y "localhost" que agregaba Chrome). Sólo frontend.
+
+```powershell
+git fetch
+git reset --hard origin/main
+cd web
+npm.cmd run build
+cd ..
+```
+Verificar: imprimir un informe → ocupa la hoja completa, sin encabezado/pie del navegador.
+
 ### 2026-07 — Modo oscuro: Carga de Resultados
 
 - Código: `web/src/pages/CargaResultados.tsx` (colores claros fijos → versiones con opacidad, se adaptan a claro/oscuro). Sólo frontend.

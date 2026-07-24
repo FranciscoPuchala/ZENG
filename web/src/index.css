@@ -180,10 +180,12 @@
   .no-print {
     display: none !important;
   }
-  /* Configuración de página A4 */
+  /* Configuración de página A4. margin:0 → la hoja (210x297mm, con sus propios
+     márgenes internos) ocupa TODA la página y no deja lugar al encabezado/pie
+     que Chrome agrega (título "ZENG" arriba y "localhost" abajo). */
   @page {
     size: A4;
-    margin: 15mm 18mm;
+    margin: 0;
   }
   body {
     background: white !important;
